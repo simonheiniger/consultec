@@ -1,0 +1,257 @@
+{
+  "common": {
+    "cta": {
+      "email": "Email us",
+      "phone": "+41 52 317 00 33",
+      "emailAria": "Email Consultec",
+      "phoneAria": "Call Consultec"
+    },
+    "companyName": "Consultec Heiniger",
+    "companyShort": "Consultec",
+    "tagline": "Software · Training · Support"
+  },
+  "nav": {
+    "home": "Home",
+    "services": "Services",
+    "software": "Software",
+    "references": "Clients",
+    "sponsoring": "Sponsoring",
+    "contact": "Contact",
+    "skip": "Skip to content",
+    "menu": "Menu",
+    "close": "Close"
+  },
+  "locale": {
+    "ariaLabel": "Language",
+    "de": "DE",
+    "en": "EN"
+  },
+  "hero": {
+    "eyebrow": "Consultec Heiniger · Winterthur",
+    "title": "Business software that gives workshops, trades and hospitality their day back.",
+    "subtitle": "For over two decades we've been installing, training and supporting Swiss SMEs with SwissGarage, SwissOffice and ForrerGastro. One point of contact. No ticketing queue. No runaround.",
+    "ctaPrimary": "Email us",
+    "ctaSecondary": "Explore the software",
+    "scrollHint": "Scroll"
+  },
+  "pillars": {
+    "title": "What we take off your plate.",
+    "items": [
+      { "label": "IT", "text": "Workstations, servers, backups, licensing. Done right the first time." },
+      { "label": "Admin", "text": "Quote, order, QR invoice, ledger. One flow, no re-typing." },
+      { "label": "Network", "text": "Wi-Fi and wiring that still works when you need it on Saturday." },
+      { "label": "DMS", "text": "Documents archived, findable, audit-ready." }
+    ]
+  },
+  "softwareTeaser": {
+    "title": "Three products. One philosophy: everything connects.",
+    "items": [
+      { "slug": "swissgarage", "title": "SwissGarage", "tagline": "Orders, parts, invoicing, vehicle sales. The shop-floor software for Swiss garages.", "cta": "See details" },
+      { "slug": "swissoffice", "title": "SwissOffice", "tagline": "Quotes, invoices, stock, bookkeeping. For trades and service businesses.", "cta": "See details" },
+      { "slug": "forrergastro", "title": "ForrerGastro", "tagline": "Service on a tablet, closing on the database. Hospitality without the gaps.", "cta": "See details" }
+    ]
+  },
+  "servicesTeaser": {
+    "title": "We don't just install. We stay.",
+    "text": "On-site or TeamViewer demos. Training around your workflow. Coaching until the team is fluent. Support that actually helps on the first call.",
+    "cta": "See our services"
+  },
+  "referencesPreview": {
+    "title": "Running every day at Swiss SMEs for years.",
+    "cta": "All clients"
+  },
+  "supportHours": {
+    "title": "Available when you need us.",
+    "morning": "Monday – Friday · 08:30 – 11:30",
+    "afternoon": "Monday – Friday · 13:30 – 17:00",
+    "note": "Outside these hours, email us – we reply the next working day."
+  },
+  "services": {
+    "title": "Services",
+    "intro": "The gap between software and your day-to-day. We close it.",
+    "swissgarage": {
+      "title": "SwissGarage & SwissOffice",
+      "tagline": "Installation, training and ongoing support around our shop-floor software.",
+      "bullets": [
+        "Demo by TeamViewer or on-site",
+        "Sales, installation and setup",
+        "Remote support via TeamViewer",
+        "Training on specific topics or features",
+        "Coaching until your team is confident",
+        "Hands-on practice with real jobs",
+        "Application-question support by remote session",
+        "General advice on software decisions"
+      ]
+    },
+    "admin": {
+      "title": "Administration & Process Coaching",
+      "tagline": "Lifting admin off your team – from job creation to insurance billing.",
+      "bullets": [
+        "Workshop flow analysis and tightening",
+        "Order processing directly from SwissGarage",
+        "Parts orders pulled straight into the job",
+        "Archiving vehicles, customers, invoices, debtors, creditors",
+        "Insurance billing with deductibles and VAT handling",
+        "Additional administrative tasks on request"
+      ]
+    }
+  },
+  "software": {
+    "title": "Software",
+    "intro": "Three products built for specific industries. One data model, from contact to ledger.",
+    "swissgarage": {
+      "title": "SwissGarage",
+      "tagline": "The complete solution for Swiss garages.",
+      "description": "Addresses, orders, parts imports, invoicing and vehicle trading in one interface. Parts pulled directly from Derendinger, Hostettler, ESA, Rhiag and MCL. Leasing and insurance cases run cleanly. QR invoices post automatically to the debtor.",
+      "features": [
+        "Address and order management",
+        "Parts imports: Derendinger, Hostettler, ESA, Rhiag, MCL",
+        "Invoicing, leasing and insurance billing",
+        "Vehicle trading: new and used",
+        "QR invoice with automatic debtor posting",
+        "Vehicle logbook and stock",
+        "Integrated accounting with VAT, debtors, creditors",
+        "Mail merge, document management (DMS)",
+        "Single-user or network deployment"
+      ]
+    },
+    "swissoffice": {
+      "title": "SwissOffice",
+      "tagline": "For trades and service businesses.",
+      "description": "Quotes, invoices, stock, accounting – one interface, no spreadsheet detours. QR invoices post themselves. Multi-user included.",
+      "features": [
+        "Address management",
+        "Quotes and invoices",
+        "QR invoice with automatic debtor posting",
+        "Stock management",
+        "Integrated accounting with VAT",
+        "Debtors and creditors",
+        "Mail merge and email",
+        "Document management (DMS)",
+        "Single-user or network deployment"
+      ]
+    },
+    "forrergastro": {
+      "title": "ForrerGastro",
+      "tagline": "Hospitality without the gaps.",
+      "description": "Database on a PC, service on iOS or Android tablets (8\" and up). Closing posts every revenue type automatically – cash, cards, vouchers. Kitchen and bar print to your rules.",
+      "features": [
+        "Daily closing with automatic posting of all revenue types",
+        "Invoices and PDF output",
+        "QR receipt with automatic debtor posting",
+        "Debtor and creditor management",
+        "Integrated accounting with VAT options",
+        "Contact and address management with import",
+        "Correspondence tools",
+        "Stock with ordering",
+        "Product statistics",
+        "Configurable kitchen and bar printing"
+      ]
+    },
+    "systems": {
+      "title": "Supported systems",
+      "rows": [
+        { "label": "SwissGarage / SwissOffice", "value": "Windows 7, 10, 11 · Server 2008, 2012, 2016, 2022 · single-user or network" },
+        { "label": "ForrerGastro", "value": "Windows PC as database · iOS or Android 8\" and up as service device · over Wi-Fi" }
+      ]
+    }
+  },
+  "references": {
+    "title": "Clients",
+    "intro": "A selection of businesses running our software every working day.",
+    "clients": [
+      "Garage Alder AG",
+      "Garage Engenbrunnen GmbH",
+      "Garage Simon Kunz",
+      "Samuel Forrer Software",
+      "LeitKraft GmbH",
+      "Hittwysshandwerk Wyss",
+      "A&G Computer",
+      "Trimoba AG",
+      "Dorfgarage Fiorentino GmbH",
+      "Dorfgarage Nef GmbH",
+      "Solero Automobile GmbH",
+      "Graf Fahrzeugtechnik GmbH",
+      "Zollgarage Neuhausen GmbH",
+      "W-CARS AG",
+      "Autohaus Amriswil",
+      "Garage Linde",
+      "Replace Car GmbH",
+      "PAROZ AG",
+      "Marcel Schwarz, Hettlingen"
+    ],
+    "cta": "Your business isn't on the list? Get in touch."
+  },
+  "sponsoring": {
+    "title": "Sponsoring",
+    "intro": "We back the people and places that make Winterthur and the region tick – in sport, and in the trades.",
+    "items": [
+      { "name": "HC Andelfingen", "role": "Handball club, youth development", "url": "https://www.hcandelfingen.ch/" },
+      { "name": "Basketball Club Winterthur", "role": "Local basketball club", "url": "https://bcwinterthur.ch/" },
+      { "name": "Special Olympics Switzerland", "role": "Inclusive grassroots sport", "url": "https://specialolympics.ch/" },
+      { "name": "Hittwysshandwerk Wyss", "role": "Craft and trade initiative", "url": "https://hittwysshandwerk.ch/" }
+    ]
+  },
+  "kontakt": {
+    "title": "Contact",
+    "intro": "During office hours we reply within minutes. Or stop by in Winterthur.",
+    "address": { "label": "Address", "line1": "Poststrasse 3", "line2": "8406 Winterthur", "country": "Switzerland" },
+    "phone": { "label": "Phone", "primary": "+41 52 317 00 33", "secondary": "+41 77 500 50 23" },
+    "email": { "label": "Email", "value": "info@consultec.swiss" },
+    "hours": { "label": "Hours", "primary": "Mon – Fri · 08:30 – 11:30", "secondary": "Mon – Fri · 13:30 – 17:00" },
+    "map": { "title": "Find us here.", "directions": "Get directions", "ariaLabel": "Map: Poststrasse 3, 8406 Winterthur", "loading": "Loading map …" },
+    "fernwartung": {
+      "title": "Remote support",
+      "text": "Download TeamViewer Quicksupport, run the file, then share the ID shown on your screen. We'll be with you in seconds.",
+      "cta": "Download Quicksupport",
+      "href": "https://consultec.swiss/wp-content/uploads/downloads/Software/Quicksupport.zip"
+    }
+  },
+  "footer": {
+    "description": "Software, training and support for workshops, trades and hospitality. Based in Winterthur.",
+    "explore": "Explore",
+    "contact": "Contact",
+    "legal": { "title": "Legal", "impressum": "Imprint", "datenschutz": "Privacy" },
+    "credit": "Website designed by",
+    "copyright": "© {year} Consultec Heiniger. All rights reserved."
+  },
+  "legal": {
+    "impressum": {
+      "title": "Imprint",
+      "body": [
+        { "heading": "Legal entity", "paragraphs": ["Consultec Heiniger", "Owner: Beat Heiniger", "Poststrasse 3", "8406 Winterthur", "Switzerland"] },
+        { "heading": "Contact", "paragraphs": ["Phone: +41 52 317 00 33 / +41 77 500 50 23", "Email: info@consultec.swiss"] },
+        { "heading": "Disclaimer", "paragraphs": ["The author makes no warranty as to the timeliness, correctness, completeness or quality of the information provided. Liability claims for damages of any kind arising from the use or non-use of the information offered are excluded."] },
+        { "heading": "Copyright", "paragraphs": ["Copyright and all other rights to content, images, photos or other files on this website belong exclusively to Consultec Heiniger or the specifically named rights holders."] }
+      ]
+    },
+    "datenschutz": {
+      "title": "Privacy",
+      "body": [
+        { "heading": "Overview", "paragraphs": ["Consultec Heiniger takes the protection of your personal data seriously. Personal data is handled in line with the Swiss Federal Act on Data Protection (FADP)."] },
+        { "heading": "Collection and processing", "paragraphs": ["We process data only where necessary for performing a contract, delivering a service or meeting legal obligations. Data is shared with third parties only to the extent required for those purposes."] },
+        { "heading": "Server log files", "paragraphs": ["When you visit the website, the server automatically records technical data such as IP address, browser type and access time. This data cannot be attributed to an individual and is used only for security and operational purposes."] },
+        { "heading": "Your rights", "paragraphs": ["You have the right to access, correct, delete and restrict the processing of your personal data. For any request, email info@consultec.swiss."] }
+      ]
+    }
+  },
+  "meta": {
+    "home": { "title": "Consultec Heiniger · Software, training and support in Winterthur", "description": "SwissGarage, SwissOffice and ForrerGastro: industry software for Swiss SMEs. Installation, training and support from Winterthur – trusted for over two decades." },
+    "services": { "title": "Services · Consultec Heiniger", "description": "Demos, installation, training, coaching and remote support for SwissGarage and SwissOffice. One point of contact for your operation in Winterthur." },
+    "software": { "title": "Software: SwissGarage, SwissOffice, ForrerGastro · Consultec", "description": "Three industry solutions, one data model. Orders, parts, QR invoicing, accounting and stock – all in one interface for workshop, trades and hospitality." },
+    "references": { "title": "Clients · Consultec Heiniger Winterthur", "description": "Garages, trade businesses and service providers across Switzerland rely on our software every day. A selection of our clients." },
+    "sponsoring": { "title": "Sponsoring · Consultec Heiniger", "description": "We back HC Andelfingen, Basketball Club Winterthur, Special Olympics Switzerland and Hittwysshandwerk Wyss." },
+    "kontakt": { "title": "Contact · Consultec Heiniger Winterthur", "description": "Poststrasse 3, 8406 Winterthur. Phone +41 52 317 00 33. Available Mon–Fri 08:30 – 11:30 and 13:30 – 17:00. Remote support via TeamViewer Quicksupport." },
+    "impressum": { "title": "Imprint · Consultec Heiniger", "description": "Legal details for Consultec Heiniger, owner Beat Heiniger, Poststrasse 3, 8406 Winterthur." },
+    "datenschutz": { "title": "Privacy · Consultec Heiniger", "description": "How Consultec Heiniger handles personal data. Your rights under the Swiss Federal Act on Data Protection." }
+  },
+  "login": {
+    "title": "Preview access",
+    "subtitle": "This site is being reviewed. Enter the password to open the preview.",
+    "passwordLabel": "Password",
+    "submit": "Open",
+    "submitting": "Checking …",
+    "error": "Wrong password. Please try again.",
+    "serverError": "Something went wrong. Please try again later."
+  }
+}
