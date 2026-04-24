@@ -1,0 +1,217 @@
+@A+
+@C+
+@I:Kre_Global
+
+//=================================================================================================
+// main() campt54
+//=================================================================================================
+main
+  (
+  aXmlPNE : alpha(512);
+  aBank : alpha(16);
+  )
+local
+  {
+  tXml : handle;
+  tRet : int;
+  tNode : handle;
+  tItem : handle;
+  tVersion : alpha(10);
+  tItem3 : handle;
+  tALevel : handle;
+  tBLevel : handle;
+  tCLevel : handle;
+  tDLevel : handle;
+  tRoot2 : handle;
+  tRoot3 : handle;
+  tRoot4 : handle;
+  tValuta : alpha(32);
+  tBook : alpha(10);
+  tCharges : alpha(36);
+  tMem : handle;
+  tRow : alpha(500);
+  tFsi : handle;
+  tDateTime : alpha(32);
+  tDate : date;
+  tIbanKreditor : alpha(32);
+  tNameKreditor : alpha(64);
+  tCount : int;
+  }
+{
+
+RecRead(997,1,_REcFirst);
+//--- Global ------------------------------------
+VarAllocate(KreGlobal);
+//--- Error -------------------------------------
+ErrCall('Kre_Error');
+trysub
+{
+ErrTryCatch(_ErrAll,true);
+
+tMem # MemAllocate(_MemAutoSize);
+tXml # CteOpen(_CteNode);
+tRet # XmlLoad(tXml,aXmlPNE,0);
+
+//--- Version -----------------------------------
+tNode # tXml->CteRead(_CteNodePath, 0, 'Document');
+tNode # tNode->CteRead(_CteAttribTree | _CteCmpE, 0, 'xmlns');
+tVersion # StrCut(tNode->spValueAlpha,StrLen(tNode->spValueAlpha)-9,10);
+switch(tVersion) // campt54
+  {
+  case '054.001.02' : ; // SGKB
+  case '054.001.04' : ; // Postfinance | Raiffeisen
+  case '054.001.08' : ; //  Raiffeisen
+  default :
+    {
+    WinDialogBox(0,'Fehler','Die Version '+tVersion+' des camt.054 Formats wird nicht unterst�tzt.'+sBR+'Bitte wenden Sie sich an den Support.',_WinIcoWarning,_WinDialogOK,1);
+    return;
+    }
+  }
+//--- A - Level ---------------------------------
+tALevel # tXml->CteRead(_CteNodePath, 0, 'Document/BkToCstmrDbtCdtNtfctn/GrpHdr');
+
+//--- B - Level ---------------------------------
+tBLevel # tXml->CteRead(_CteNodePath, 0, 'Document/BkToCstmrDbtCdtNtfctn/Ntfctn');
+for   tCLevel # tBLevel->CteRead(_CteChildList | _CteFirst);
+loop  tCLevel # tBLevel->CteRead(_CteChildList | _CteNext, tCLevel);
+while (tCLevel > 0)
+  {
+  if(tCLevel->spName = 'Ntry')
+    {
+    //--- C-Level -------------------------------
+    tValuta # StrCut(Mdl_Lib:NodeReadAlpha(tCLevel,'ValDt/Dt'),1,10); // Valuta Datum
+    tDate # CnvDA(StrCut(tValuta,1,10),_FmtDateYMD);
+    tValuta # CnvAD(tDate,_FmtInternal);
+    tBook # StrCut(Mdl_Lib:NodeReadAlpha(tCLevel,'BookgDt/Dt'),1,10); // Buchungsdatum
+    tDate # CnvDA(StrCut(tBook,1,10),_FmtDateYMD);
+    tBook # CnvAD(tDate,_FmtInternal);
+    //--- D-Level -------------------------------
+    tRoot2 # tCLevel->CteRead(_CteNodePath, 0, 'NtryDtls');
+    for   tDLevel # tRoot2->CteRead(_CteChildList | _CteFirst);
+    loop  tDLevel # tRoot2->CteRead(_CteChildList | _CteNext, tDLevel);
+    while (tDLevel > 0)
+      {
+      if(tDLevel->spName = 'TxDtls')
+        {
+        tRow # '';
+        tRow # Mdl_Lib:NodeReadAlpha(tDLevel,'RmtInf/Strd/CdtrRefInf/Ref'); // Refeznummer EZ
+        switch(tVersion)
+          {
+          case '054.001.02' : tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'AmtDtls/InstdAmt/Amt'); // Betrag
+          case '054.001.04' : tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'Amt'); // Betrag
+          case '054.001.08' : tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'Amt'); // Betrag
+          }
+        tRow # tRow + ';' + tValuta; // Valuta Datum
+        tRow # tRow + ';' + tBook; // Buchungsdatum
+        tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'Refs/AcctSvcrRef'); //  Eindeutige vom Finanzinstitut zugewiesene Referenz der Buchung.
+
+        switch(tVersion)
+          {
+          case '054.001.02' :  tCharges # Mdl_Lib:NodeReadAlpha(tDLevel,'Chrgs/Amt'); // Spesen
+          case '054.001.04' : tCharges # Mdl_Lib:NodeReadAlpha(tDLevel,'Chrgs/TtlChrgsAndTaxAmt'); // Spesen
+          case '054.001.08' : tCharges # Mdl_Lib:NodeReadAlpha(tDLevel,'Chrgs/TtlChrgsAndTaxAmt'); // Spesen
+          }
+        if(tCharges = '')
+          tRow # tRow + ';' + '0.00';
+        else
+          tRow # tRow + ';' + tCharges;
+        tRow # tRow + ';' + Mdl_Lib:StrRep(Mdl_Lib:NodeReadAlpha(tDLevel,'RmtInf/Strd/AddtlRmtInf'),'?REJECT?',''); // Reject Info
+        tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/DbtrAcct/Id/IBAN'); // Debitor IBAN
+        if (Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/Nm') != 'NOTPROVIDED')
+          {
+          tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/Nm'); // Debitor Name
+          if(tDLevel->CteRead(_CteNodePath, 0, 'RltdPties/Dbtr/Nm') != 0)
+            {
+            if(tDLevel->CteRead(_CteNodePath, 0, 'RltdPties/Dbtr/PstlAdr/StrtNm') != 0)
+              {
+              tRow # tRow + ', ' + Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/PstlAdr/StrtNm'); // Debitor Street
+              tRow # tRow + ' ' + Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/PstlAdr/BldgNb'); // Debitor Building Number
+              tRow # tRow + ', ' + Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/PstlAdr/PstCd'); // Debitor PLZ
+              tRow # tRow + ' ' +Mdl_Lib:NodeReadAlpha(tDLevel,'RltdPties/Dbtr/PstlAdr/TwnNm'); // Debitor Town
+              }
+            else
+              {
+              tRoot3 # tDLevel->CteRead(_CteNodePath, 0, 'RltdPties/Dbtr/PstlAdr');
+              if(tRoot3 != 0)
+                {
+                for   tItem3 # tRoot3->CteRead(_CteChildList | _CteFirst);
+                loop  tItem3 # tRoot3->CteRead(_CteChildList | _CteNext, tItem3);
+                while (tItem3 > 0)
+                  {
+                  tRow # tRow + ', ' + Mdl_Lib:NodeReadAlpha(tItem3,''); // Adress Line
+                  }
+                }
+              }
+            }
+          }
+        else
+          {
+          tRow # tRow + ';'
+          }
+        
+        if(Mdl_Lib:NodeReadAlpha(tDLevel,'RltdAgts/DbtrAgt/FinInstnId/Nm') != '')
+          {
+          tRow # tRow+';'+Mdl_Lib:NodeReadAlpha(tDLevel,'RltdAgts/DbtrAgt/FinInstnId/Nm'); // Debitor Finanzinstitut Name
+          tNode # Mdl_Lib:NodeRead(tDLevel,'RltdAgts/DbtrAgt/FinInstnId/PstlAdr');
+          if(tNode > 0) // Ausnahme TKB
+            {
+            tCount # 0;
+
+            tItem # tNode->CteRead(_CteChildList | _CteFirst);
+            if(tItem > 0)
+              tRow # tRow + ';'+Mdl_Lib:NodeReadAlpha(tItem,''); // Debitor Finanzinstitut AdrLine 1
+            else
+              tRow # tRow + ';';
+
+            tItem # tNode->CteRead(_CteChildList | _CteNext,tItem);
+            if(tItem > 0)
+              tRow # tRow + ';'+Mdl_Lib:NodeReadAlpha(tItem,''); // Debitor Finanzinstitut AdrLine 2
+            else
+              tRow # tRow + ';';
+            }
+          else
+            {
+            tRow # tRow + ';;';
+            }
+          }
+        else
+          tRow # tRow + ';;;';
+        tRow # tRow + sBR;
+        MemWriteStr(tMem,tMem->spLen+1,tRow);
+        }
+      }
+    }
+  }
+tFsi # FsiOpen("SYS-TEMP"+'\VRE.txt',_FsiCreate | _FsiAcsRW | _FsiTruncate);
+tRet # FsiWriteMem(tFsi,tMem,1,tMem->spLen);
+tFsi->FsiClose();
+tMem->MemFree();
+
+//--- VTO ---------------------------------------
+tMem # MemAllocate(_MemAutoSize);
+tDateTime # Mdl_Lib:NodeReadAlpha(tALevel,'CreDtTm');
+tRow # '';
+tDate # CnvDA(StrCut(tDateTime,1,10),_FmtDateYMD);
+tRow # CnvAD(tDate,_FmtInternal); // Date
+tRow # tRow + ';' + StrCut(tDateTime,12,8); //Time
+tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tXml,'Document/BkToCstmrDbtCdtNtfctn/Ntfctn/Ntry/NtryRef'); // Kontonummer
+tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tBLevel,'Acct/Id/IBAN'); // Iban Kreditor
+tRow # tRow + ';' + Lib_Str:Rep(Mdl_Lib:NodeReadAlpha(tALevel,'MsgId'),';',''); // MesageId
+//tRow # tRow + ';' + StrCnv(Mdl_Lib:NodeReadAlpha(tALevel,'MsgId'),_StrLetterExt); // MesageId
+//tRow # tRow + ';' + Mdl_Lib:NodeReadAlpha(tBLevel,'Acct/Ownr/Nm'); // Name Kreditor
+
+// <MsgId>20180628375204036086513</MsgId>
+
+MemWriteStr(tMem,tMem->spLen+1,tRow);
+tFsi # FsiOpen("SYS-TEMP"+'\VTO.txt',_FsiCreate | _FsiAcsRW | _FsiTruncate);
+tRet # FsiWriteMem(tFsi,tMem,1,tMem->spLen);
+tFsi->FsiClose();
+tMem->MemFree();
+tXml->CteClose();
+}
+//--- Error -------------------------------------
+if(ErrGet() != 0)
+  {
+  WinDialogBox(0,'ISO 20022','Fehler beim lesen der Datei '+aXmlPNE,_WinIcoError,_WinDialogOK,1);
+  }
+}

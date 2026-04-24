@@ -1,0 +1,328 @@
+@A+
+@C+
+@I:Kre_Global
+
+//=================================================================================================
+// main()
+//=================================================================================================
+main
+(
+  aXmlPNE : alpha(512); // Zieldatei
+  aBZADatIdt : int; // Datei 221, BZA-DatIdt
+  aSelName : alpha(64);
+  aValutaDatum : date;  // "ZUG-Datum"
+  aWaehrungKonto : alpha(3); // W„hrung fr alle Zahlungsempf„nger
+)
+local
+{
+  aXml : handle;
+  tRet : int;
+  tCaltime : caltime;
+  tDateTime : alpha(32);
+  tNow : time;
+  tTime : alpha(16);
+  qKre : handle;
+  qErg : handle;
+  qBko : handle;
+  qAdr : handle;
+  tTrnsCount : int;
+  tAmountTotal : float;
+  tBLevel : handle;
+  tCLevel : handle;
+  tExecutionDate : alpha(16);
+  tCount : int;
+  tSel : handle;
+}
+{
+  //--- Error -------------------------------------
+  ErrCall('Kre_Error');
+
+  qKre # RecBufCreate(220);
+  qErg # RecBufCreate(989);
+  qBko # RecBufCreate(203);
+  qAdr # RecBufCreate(1);
+  //--- Init --------------------------------------
+  if(aWaehrungKonto = '')
+    aWaehrungKonto # 'CHF';
+  //--- Sys ---------------------------------------
+  RecRead(997,1,_RecFirst);
+
+  //--- Selection ---------------------------------
+  tSel # SelOpen();
+  tRet # tSel->SelRead(220,_SelLock,aSelName);
+  //--- Error -------------------------------------
+  if(tRet != 0)
+  {
+    tRet # tSel->SelRead(220,_SelUnLock,aSelName);
+    WinDialogBox(0,'Fehler','Selektion ungltig.'+StrChar(13)+StrChar(10)+'Xml Datei k”nnte nicht erstellt werden.',_WinIcoWarning,_WinDialogOK,1);
+    return;
+  }
+
+  tRet # RecInfo(220,_RecCount,tSel);
+  //--- Error -------------------------------------
+  if(tRet = 0)
+  {
+    tRet # tSel->SelRead(220,_SelUnLock,aSelName);
+    WinDialogBox(0,'Fehler','Keine Kreditoren vorhanden.'+StrChar(13)+StrChar(10)+'Xml Datei k”nnte nicht erstellt werden.',_WinIcoWarning,_WinDialogOK,1);
+    return;
+  }
+
+  //--- Kreditoren --------------------------------
+  for tRet # RecRead(qKre,tSel,_RecFirst);
+  loop tRet # RecRead(qKre,tSel,_RecNext);
+  while(tRet = 0)
+  {
+    tRet # RecLink(qErg,qKre,16,_RecFirst)
+    if(qErg->"ERG-DTA Minus" = false)
+    {
+      Inc(tTrnsCount);
+      tAmountTotal # tAmountTotal+qKre->"KRE-Betrag";
+    }
+  }
+
+  //--- Bankkonto ---------------------------------
+  tRet # RecLink(qBko,qKre,2,_RecFirst);
+
+  //--- Gutschriften Rechnung ---------------------
+  for tRet # RecRead(qErg,1,_RecFirst);
+  loop tRet # RecRead(qErg,1,_RecNext);
+  while(tRet = 0)
+  {
+    if(qErg->"ERG-DTA Minus" = true)
+    {
+      Inc(tTrnsCount);
+      tAmountTotal # tAmountTotal+qErg->"ERG-Gleit1";
+    }
+  }
+  //--- Error -------------------------------------
+  if(tTrnsCount = 0)
+  {
+    tRet # tSel->SelRead(220,_SelUnLock,aSelName);
+    WinDialogBox(0,'Fehler','Keine Kreditoren gefunden.'+StrChar(13)+StrChar(10)+'Xml Datei k”nnte nicht erstellt werden.',_WinIcoWarning,_WinDialogOK,1);
+    return;
+  }
+
+  //--- Date Time ---------------------------------
+  tCaltime->vmSystemTime();
+  tDateTime # CnvAI(tCaltime->vpYear,_FmtNumNoGroup);
+  tDateTime # tDateTime+'-'+CnvAI(tCaltime->vpMonth,_FmtNumNoGroup | _FmtNumLeadZero,0,2);
+  tDateTime # tDateTime+'-'+CnvAI(tCaltime->vpDay,_FmtNumNoGroup | _FmtNumLeadZero,0,2);
+  tNow->vmSystemTime();
+  tDateTime # tDateTime+'T'+CnvAT(tNow,_FmtTimeSeconds);
+  //--- Execution Date ----------------------------
+  tExecutionDate # CnvAI(aValutaDatum->vpYear,_FmtNumNoGroup);
+  tExecutionDate # tExecutionDate+'-'+CnvAI(aValutaDatum->vpMonth,_FmtNumNoGroup | _FmtNumLeadZero,0,2);
+  tExecutionDate # tExecutionDate+'-'+CnvAI(aValutaDatum->vpDay,_FmtNumNoGroup | _FmtNumLeadZero,0,2);
+
+  //--- XML Start ---------------------------------
+  aXml # CteOpen(_CteNode);
+  aXml->spID # _XmlNodeDocument;
+  Kre_Lib:NodeInsert(aXml,'Document');
+  Kre_Lib:NodeInsertAttribut(aXml,'Document','xmlns','http://www.six-interbank-clearing.com/de/pain.001.001.03.ch.02.xsd');
+  Kre_Lib:NodeInsertAttribut(aXml,'Document','xmlns:xsi','http://www.w3.org/2001/XMLSchema-instance');
+  Kre_Lib:NodeInsertAttribut(aXml,'Document','xsi:schemaLocation','http://www.six-interbank-clearing.com/de/pain.001.001.03.ch.02.xsd  pain.001.001.03.ch.02.xsd');
+  Kre_Lib:NodeInsert(aXml,'Document/CstmrCdtTrfInitn');
+
+  //--- Group Header ------------------------------   A-Level
+  Kre_Lib:NodeInsert(aXml,'Document/CstmrCdtTrfInitn/GrpHdr');
+  Kre_Lib:NodeInsertAlpha(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/MsgId',qBko->"BKO-Bankkonto"+'-'+sCnvAI(aBZADatIdt)); // Transaktions Id
+  Kre_Lib:NodeInsertAlpha(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/CreDtTm',tDateTime); // Erstell Datum
+  Kre_Lib:NodeInsertAlpha(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/NbOfTxs',sCnvAI(tTrnsCount)); // Anzahl Transaktionen
+  Kre_Lib:NodeInsertAlpha(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/CtrlSum',sCnvAF(tAmountTotal)); // Kontrollsumme
+  Kre_Lib:NodeInsert(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/InitgPty');
+  Kre_Lib:NodeInsertAlpha(aXml,'Document/CstmrCdtTrfInitn/GrpHdr/InitgPty/Nm',Lib_User:GetId()); // Absender der Meldung
+
+
+  //--- Payment Information -----------------------   B-Level
+  tBLevel # Kre_Lib:NodeInsert(aXml,'Document/CstmrCdtTrfInitn/PmtInf');
+  Kre_Lib:NodeInsertAlpha(tBLevel,'PmtInfId',sCnvAI(aBZADatIdt)); // Zahlungsgruppenreferenz Id
+  Kre_Lib:NodeInsertAlpha(tBLevel,'PmtMtd','TRF'); // Zahlungsmethode TRF oder TRA (beide gleich)
+  Kre_Lib:NodeInsertAlpha(tBLevel,'BtchBookg','true'); // Sammelbuchung (Standardm„ssig true)
+  Kre_Lib:NodeInsertAlpha(tBLevel,'ReqdExctnDt',tExecutionDate); // Gewnschtes Ausfhrungsdatum
+  Kre_Lib:NodeInsert(tBLevel,'Dbtr');
+  Kre_Lib:NodeInsertAlpha(tBLevel,'Dbtr/Nm',qBko->"BKO-NameVorname"); // Name Vorname des Zahlungspflichtigen
+  Kre_Lib:NodeInsert(tBLevel,'DbtrAcct');
+  Kre_Lib:NodeInsert(tBLevel,'DbtrAcct/Id');
+  Kre_Lib:NodeInsertAlpha(tBLevel,'DbtrAcct/Id/IBAN',qBko->"BKO-Bankkonto"); // Kontonummer (IBAN) des Zahlungspflichtigen
+  Kre_Lib:NodeInsert(tBLevel,'DbtrAcct/Tp');
+  Kre_Lib:NodeInsertAlpha(tBLevel,'DbtrAcct/Tp/Prtry','NOA'); // Belastungsanzeige NOA : keine Anzeige, SIA Einzel Anzeige, CND Sammelanzeige keine Details, CWD Sammelanzeige mit Details
+
+  if(qBko->"BKO-BIC" != '')
+  {
+    //--- Bic -------------------------------------
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt');
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt/FinInstnId');
+    Kre_Lib:NodeInsertAlpha(tBLevel,'DbtrAgt/FinInstnId/BIC',qBko->"BKO-BIC"); //BIC des Zahlungspflichtigen
+  }
+  else
+  {
+    //--- BC-Nummer "BKO-Clearing" ----------------
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt');
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt/FinInstnId');
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt/FinInstnId/ClrSysMmbId');
+    Kre_Lib:NodeInsert(tBLevel,'DbtrAgt/FinInstnId/ClrSysMmbId/ClrSysId');
+    Kre_Lib:NodeInsertAlpha(tBLevel,'DbtrAgt/FinInstnId/ClrSysMmbId/ClrSysId/Cd','CHBCC');
+    Kre_Lib:NodeInsertAlpha(tBLevel,'DbtrAgt/FinInstnId/ClrSysMmbId/MmbId',qBko->"BKO-Clearing");
+  }
+
+  //--- Kreditoren ----------------------------------
+  tTrnsCount # 0;
+  for tRet # RecRead(qKre,tSel,_RecFirst);
+  loop tRet # RecRead(qKre,tSel,_RecNext);
+  while(tRet = 0)
+  {
+    tRet # RecLink(qErg,qKre,16,_RecFirst)
+    if(qErg->"ERG-DTA Minus" = false)
+    {
+      Inc(tTrnsCount);
+      switch(true)
+      {
+        case (qKre->"KRE-QR" = true) : //--- QR Rechnung  ----------------------
+        {
+          tRet # RecLink(qAdr,qKre,1,_RecFirst);
+          //--- Credit Transfer Transaction Information ---   C-Level
+          
+          tCLevel # Kre_Lib:NodeInsert(tBLevel,'CdtTrfTxInf');
+          Kre_Lib:NodeInsert(tCLevel,'PmtId');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/InstrId','01-'+CnvAI(tTrnsCount,_FmtNumLeadZero,0,4)); // Transaktionsreferenz Id
+          Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/EndToEndId','ENDTOENDID-'+sCnvAI(qKre->"KRE-DatIdt")); // End-to-End-Referenz
+          //Kre_Lib:NodeInsert(tCLevel,'PmtTpInf');
+          //Kre_Lib:NodeInsert(tCLevel,'PmtTpInf/LclInstrm');
+          //Kre_Lib:NodeInsertAlpha(tCLevel,'PmtTpInf/LclInstrm/Prtry',''); // Zahlungs Typ QR Rechnung (Node muss wegfallen)
+          Kre_Lib:NodeInsert(tCLevel,'Amt');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'Amt/InstdAmt',sCnvAF(qKre->"KRE-Betrag")); // Betrag
+          Kre_Lib:NodeInsertAttribut(tCLevel,'Amt/InstdAmt','Ccy',aWaehrungKonto); //  CHF | CHW
+          //--- Zugunsten -------------------------
+          Kre_Lib:NodeInsert(tCLevel,'Cdtr');
+          if(StrAdj(qAdr->"ADR-NameVorname",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/Nm',qAdr->"ADR-NameVorname"); // Zugunsten: Name
+          Kre_Lib:NodeInsert(tCLevel,'Cdtr/PstlAdr');
+          if(StrAdj(qAdr->"ADR-StrasseName",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/StrtNm',qAdr->"ADR-StrasseName"); // Zugunsten: Strasse
+          if(StrAdj(qAdr->"ADR-StrasseNummer",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/BldgNb',qAdr->"ADR-StrasseNummer"); // Zugunsten: Hausnummer
+          if(qAdr->"ADR-QRPLZ" != 0)
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/PstCd',sCnvAI(qAdr->"ADR-QRPLZ")); // Zugunsten: PLZ
+          if(StrAdj(qAdr->"ADR-QROrt",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/TwnNm',qAdr->"ADR-QROrt"); // Zugunsten: Ort
+          if(StrAdj(qAdr->"ADR-QRLand",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/Ctry',qAdr->"ADR-QRLand"); // Zugunsten: Land
+            
+            
+          //--- Zugunsten Konto Daten ---------------
+          Kre_Lib:NodeInsert(tCLevel,'CdtrAcct');
+          Kre_Lib:NodeInsert(tCLevel,'CdtrAcct/Id');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'CdtrAcct/Id/IBAN',qKre->"KRE-DTA Bankkonto"); // QR IBAN
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf');
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf/Strd');
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf/Strd/CdtrRefInf');
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf/Strd/CdtrRefInf/Tp');
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf/Strd/CdtrRefInf/Tp/CdOrPrtry');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'RmtInf/Strd/CdtrRefInf/Tp/CdOrPrtry/Prtry','QRR'); // QR Type
+          Kre_Lib:NodeInsertAlpha(tCLevel,'RmtInf/Strd/CdtrRefInf/Ref',qKre->"KRE-DTAReferenz"); // QR Referenzzeile
+        }
+        case (aValutaDatum >= 1.10.2022) : //--- Zahlungsart 3 ---------------------
+        {
+          tRet # RecLink(qAdr,qKre,1,_RecFirst);
+          //--- Credit Transfer Transaction Information ---   C-Level
+          
+          tCLevel # Kre_Lib:NodeInsert(tBLevel,'CdtTrfTxInf');
+          Kre_Lib:NodeInsert(tCLevel,'PmtId');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/InstrId','01-'+CnvAI(tTrnsCount,_FmtNumLeadZero,0,4)); // Transaktionsreferenz
+          Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/EndToEndId','ENDTOENDID-'+sCnvAI(qKre->"KRE-DatIdt")); // End-to-End-Referenz
+          // Kre_Lib:NodeInsert(tCLevel,'PmtTpInf');
+          // Kre_Lib:NodeInsert(tCLevel,'PmtTpInf/LclInstrm');
+          // Kre_Lib:NodeInsertAlpha(tCLevel,'PmtTpInf/LclInstrm/Prtry','CH03'); // Zahlungs Typ // darf nicht geliefert werden
+          Kre_Lib:NodeInsert(tCLevel,'Amt');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'Amt/InstdAmt',sCnvAF(qKre->"KRE-Betrag")); // Betrag
+          Kre_Lib:NodeInsertAttribut(tCLevel,'Amt/InstdAmt','Ccy',aWaehrungKonto); // CHF | CHW
+          Kre_Lib:NodeInsert(tCLevel,'Cdtr');
+          if(StrAdj(qAdr->"ADR-NameVorname",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/Nm',qAdr->"ADR-NameVorname"); // Zugunsten: Name
+          Kre_Lib:NodeInsert(tCLevel,'Cdtr/PstlAdr');
+          if(StrAdj(qAdr->"ADR-StrasseName",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/StrtNm',qAdr->"ADR-StrasseName"); // Zugunsten: Strasse
+          if(StrAdj(qAdr->"ADR-StrasseNummer",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/BldgNb',qAdr->"ADR-StrasseNummer"); // Zugunsten: Hausnummer
+          if(qAdr->"ADR-QRPLZ" != 0)
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/PstCd',sCnvAI(qAdr->"ADR-QRPLZ")); // Zugunsten: PLZ
+          if(StrAdj(qAdr->"ADR-QROrt",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/TwnNm',qAdr->"ADR-QROrt"); // Zugunsten: Ort
+          if(StrAdj(qAdr->"ADR-QRLand",_StrAll) != '')
+            Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/Ctry',qAdr->"ADR-QRLand"); // Zugunsten: Land
+          Kre_Lib:NodeInsert(tCLevel,'CdtrAcct');
+          Kre_Lib:NodeInsert(tCLevel,'CdtrAcct/Id');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'CdtrAcct/Id/IBAN',qKre->"KRE-DTA Bankkonto"); // Zugunsten: IBAN
+          Kre_Lib:NodeInsert(tCLevel,'RmtInf');
+          Kre_Lib:NodeInsertAlpha(tCLevel,'RmtInf/Ustrd',StrCut(qKre->"KRE-Buchungstext",1,140)); // Zahlungszweck
+        }
+      }
+    }
+  }
+
+  //--- Gutschriften Rechnung ---------------------
+  for tRet # RecRead(qErg,1,_RecFirst);
+  loop tRet # RecRead(qErg,1,_RecNext);
+  while(tRet = 0)
+  {
+    if(qErg->"ERG-DTA Minus" = true)
+    {
+      Inc(tTrnsCount);
+      
+      //--- Credit Transfer Transaction Information ---   C-Level
+      tRet # RecLink(qAdr,qErg,1,_RecFirst);
+      //--- Zahlungsart 3 ---------------------
+      tCLevel # Kre_Lib:NodeInsert(tBLevel,'CdtTrfTxInf');
+      Kre_Lib:NodeInsert(tCLevel,'PmtId');
+      Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/InstrId','01-'+CnvAI(tTrnsCount,_FmtNumLeadZero,0,4)); // Transaktionsreferenz
+      Kre_Lib:NodeInsertAlpha(tCLevel,'PmtId/EndToEndId','ENDTOENDID-'+sCnvAI(qErg->"ERG-DTA KRE DatIdt")); // End-to-End-Referenz
+      // Kre_Lib:NodeInsert(tCLevel,'PmtTpInf');
+      // Kre_Lib:NodeInsert(tCLevel,'PmtTpInf/LclInstrm');
+      // Kre_Lib:NodeInsertAlpha(tCLevel,'PmtTpInf/LclInstrm/Prtry','CH03'); // Zahlungs Typ
+      Kre_Lib:NodeInsert(tCLevel,'Amt');
+      Kre_Lib:NodeInsertAlpha(tCLevel,'Amt/InstdAmt',sCnvAF(qErg->"ERG-Gleit1")); // Betrag
+      Kre_Lib:NodeInsertAttribut(tCLevel,'Amt/InstdAmt','Ccy',aWaehrungKonto); // CHF | CHW
+      //Kre_Lib:NodeInsert(tCLevel,'CdtrAgt');
+      //Kre_Lib:NodeInsert(tCLevel,'CdtrAgt/FinInstnId');
+      //Kre_Lib:NodeInsertAlpha(tCLevel,'CdtrAgt/FinInstnId/Nm',qErg->"ERG-Empf„nger"); // Bank Name
+      //Kre_Lib:NodeInsert(tCLevel,'CdtrAgt/FinInstnId/Othr');
+      //Kre_Lib:NodeInsertAlpha(tCLevel,'CdtrAgt/FinInstnId/Othr/Id',qErg->"ERG-DTAPCKonto"); // Konto Nummer
+      Kre_Lib:NodeInsert(tCLevel,'Cdtr');
+      if(StrAdj(qAdr->"ADR-NameVorname",_StrAll) != '')
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/Nm',qAdr->"ADR-NameVorname"); // Zugunsten: Name
+      Kre_Lib:NodeInsert(tCLevel,'Cdtr/PstlAdr');
+      if(StrAdj(qAdr->"ADR-StrasseName",_StrAll) != '')
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/StrtNm',qAdr->"ADR-StrasseName"); // Zugunsten: Strasse
+      if(StrAdj(qAdr->"ADR-StrasseNummer",_StrAll) != '')
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/BldgNb',qAdr->"ADR-StrasseNummer"); // Zugunsten: Hausnummer
+      if(qAdr->"ADR-QRPLZ" != 0)
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/PstCd',sCnvAI(qAdr->"ADR-QRPLZ")); // Zugunsten: PLZ
+      if(StrAdj(qAdr->"ADR-QROrt",_StrAll) != '')
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/TwnNm',qAdr->"ADR-QROrt"); // Zugunsten: Ort
+      if(StrAdj(qAdr->"ADR-QRLand",_StrAll) != '')
+        Kre_Lib:NodeInsertAlpha(tCLevel,'Cdtr/PstlAdr/Ctry',qAdr->"ADR-QRLand"); // Zugunsten: Land
+      Kre_Lib:NodeInsert(tCLevel,'CdtrAcct');
+      Kre_Lib:NodeInsert(tCLevel,'CdtrAcct/Id');
+      Kre_Lib:NodeInsertAlpha(tCLevel,'CdtrAcct/Id/IBAN',qErg->"ERG-DTA Bankkonto"); // Zugunsten: IBAN
+      Kre_Lib:NodeInsert(tCLevel,'RmtInf');
+      Kre_Lib:NodeInsertAlpha(tCLevel,'RmtInf/Ustrd',StrCut(qErg->"ERG-Bemerkung",1,140)); // Zahlungszweck
+          
+          
+        //}
+      //}
+    }
+  }
+
+  //--- Selection ---------------------------------
+  tRet # tSel->SelRead(220,_SelUnLock,aSelName);
+
+
+  //--- Save Xml ----------------------------------
+  tRet # XmlSave(aXml,aXmlPNE,_XmlSaveDefault,0,_CharsetUTF8,_sys->spCharset);
+
+  RecBufDestroy(qKre);
+  RecBufDestroy(qErg);
+  RecBufDestroy(qBko);
+  RecBufDestroy(qAdr);
+}
+

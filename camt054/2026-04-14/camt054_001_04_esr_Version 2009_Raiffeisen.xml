@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Document xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:camt.054.001.04 camt.054.001.04.xsd" xmlns="urn:iso:std:iso:20022:tech:xsd:camt.054.001.04" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <BkToCstmrDbtCdtNtfctn>
+        <GrpHdr>
+            <MsgId>MSG-C054-260408035750-01</MsgId>
+            <CreDtTm>2026-04-08T15:57:50.545+02:00</CreDtTm>
+            <MsgRcpt>
+                <Nm>Alder René</Nm>
+            </MsgRcpt>
+            <AddtlInf>RECONSTRUCTION</AddtlInf>
+        </GrpHdr>
+        <Ntfctn>
+            <Id>NTF-C054-260408035750-01</Id>
+            <ElctrncSeqNb>999999</ElctrncSeqNb>
+            <CreDtTm>2026-04-08T15:57:50.549+02:00</CreDtTm>
+            <CpyDplctInd>DUPL</CpyDplctInd>
+            <Acct>
+                <Id>
+                    <IBAN>CH7580808008001309728</IBAN>
+                </Id>
+                <Svcr>
+                    <FinInstnId>
+                        <Nm>Raiffeisenbank Münchwilen-Tobel</Nm>
+                    </FinInstnId>
+                </Svcr>
+            </Acct>
+            <Ntry>
+                <NtryRef>CH0630808008001309728</NtryRef>
+                <Amt Ccy="CHF">753.45</Amt>
+                <CdtDbtInd>CRDT</CdtDbtInd>
+                <RvslInd>false</RvslInd>
+                <Sts>BOOK</Sts>
+                <BookgDt>
+                    <Dt>2026-04-07</Dt>
+                </BookgDt>
+                <ValDt>
+                    <Dt>2026-04-07</Dt>
+                </ValDt>
+                <AcctSvcrRef>20395246426</AcctSvcrRef>
+                <BkTxCd>
+                    <Domn>
+                        <Cd>PMNT</Cd>
+                        <Fmly>
+                            <Cd>RCDT</Cd>
+                            <SubFmlyCd>VCOM</SubFmlyCd>
+                        </Fmly>
+                    </Domn>
+                    <Prtry>
+                        <Cd>1004</Cd>
+                    </Prtry>
+                </BkTxCd>
+                <Chrgs>
+                    <TtlChrgsAndTaxAmt Ccy="CHF">0</TtlChrgsAndTaxAmt>
+                </Chrgs>
+                <NtryDtls>
+                    <TxDtls>
+                        <Refs>
+                            <AcctSvcrRef>20395246426</AcctSvcrRef>
+                            <EndToEndId>NOTPROVIDED</EndToEndId>
+                            <Prtry>
+                                <Tp>01</Tp>
+                                <Ref>9999  9999</Ref>
+                            </Prtry>
+                        </Refs>
+                        <Amt Ccy="CHF">753.45</Amt>
+                        <CdtDbtInd>CRDT</CdtDbtInd>
+                        <BkTxCd>
+                            <Domn>
+                                <Cd>PMNT</Cd>
+                                <Fmly>
+                                    <Cd>RCDT</Cd>
+                                    <SubFmlyCd>VCOM</SubFmlyCd>
+                                </Fmly>
+                            </Domn>
+                            <Prtry>
+                                <Cd>1004</Cd>
+                            </Prtry>
+                        </BkTxCd>
+                        <Chrgs>
+                            <TtlChrgsAndTaxAmt Ccy="CHF">0</TtlChrgsAndTaxAmt>
+                        </Chrgs>
+                        <RltdPties>
+                            <Dbtr>
+                                <Nm>Annina Truempler</Nm>
+                                <PstlAdr>
+                                    <Ctry>CH</Ctry>
+                                    <AdrLine>Buehlstrasse 16</AdrLine>
+                                    <AdrLine>CH-8055 Zuerich</AdrLine>
+                                </PstlAdr>
+                            </Dbtr>
+                            <DbtrAcct>
+                                <Id>
+                                    <IBAN>CH1300781604547552000</IBAN>
+                                </Id>
+                            </DbtrAcct>
+                        </RltdPties>
+                        <RmtInf>
+                            <Strd>
+                                <CdtrRefInf>
+                                    <Tp>
+                                        <CdOrPrtry>
+                                            <Prtry>QRR</Prtry>
+                                        </CdOrPrtry>
+                                    </Tp>
+                                    <Ref>000000012404620059112402128</Ref>
+                                </CdtrRefInf>
+                                <AddtlRmtInf>Rechnung Nr.1240462 vom 12.02.2024</AddtlRmtInf>
+                            </Strd>
+                        </RmtInf>
+                        <RltdDts>
+                            <AccptncDtTm>2026-04-07T00:00:00.000+02:00</AccptncDtTm>
+                        </RltdDts>
+                    </TxDtls>
+                </NtryDtls>
+            </Ntry>
+            <Ntry>
+                <NtryRef>CH0630808008001309728</NtryRef>
+                <Amt Ccy="CHF">1263.75</Amt>
+                <CdtDbtInd>CRDT</CdtDbtInd>
+                <RvslInd>false</RvslInd>
+                <Sts>BOOK</Sts>
+                <BookgDt>
+                    <Dt>2026-04-07</Dt>
+                </BookgDt>
+                <ValDt>
+                    <Dt>2026-04-07</Dt>
+                </ValDt>
+                <AcctSvcrRef>20395767850</AcctSvcrRef>
+                <BkTxCd>
+                    <Domn>
+                        <Cd>PMNT</Cd>
+                        <Fmly>
+                            <Cd>RCDT</Cd>
+                            <SubFmlyCd>VCOM</SubFmlyCd>
+                        </Fmly>
+                    </Domn>
+                    <Prtry>
+                        <Cd>1004</Cd>
+                    </Prtry>
+                </BkTxCd>
+                <Chrgs>
+                    <TtlChrgsAndTaxAmt Ccy="CHF">0</TtlChrgsAndTaxAmt>
+                </Chrgs>
+                <NtryDtls>
+                    <TxDtls>
+                        <Refs>
+                            <AcctSvcrRef>20395767850</AcctSvcrRef>
+                            <EndToEndId>NOTPROVIDED</EndToEndId>
+                            <Prtry>
+                                <Tp>01</Tp>
+                                <Ref>9999  9999</Ref>
+                            </Prtry>
+                        </Refs>
+                        <Amt Ccy="CHF">1263.75</Amt>
+                        <CdtDbtInd>CRDT</CdtDbtInd>
+                        <BkTxCd>
+                            <Domn>
+                                <Cd>PMNT</Cd>
+                                <Fmly>
+                                    <Cd>RCDT</Cd>
+                                    <SubFmlyCd>VCOM</SubFmlyCd>
+                                </Fmly>
+                            </Domn>
+                            <Prtry>
+                                <Cd>1004</Cd>
+                            </Prtry>
+                        </BkTxCd>
+                        <Chrgs>
+                            <TtlChrgsAndTaxAmt Ccy="CHF">0</TtlChrgsAndTaxAmt>
+                        </Chrgs>
+                        <RltdPties>
+                            <Dbtr>
+                                <Nm>CARLA SURIANO TODESCO</Nm>
+                                <PstlAdr>
+                                    <AdrLine>WIELSTEINSTRASSE 51 CH 8500 FRAUENFELD</AdrLine>
+                                </PstlAdr>
+                            </Dbtr>
+                            <DbtrAcct>
+                                <Id>
+                                    <IBAN>CH780024324397419640V</IBAN>
+                                </Id>
+                            </DbtrAcct>
+                            <UltmtDbtr>
+                                <Nm>SURIANO LAURA (CALORO GRAZIANO)</Nm>
+                                <PstlAdr>
+                                    <StrtNm>WIELSTEINSTRASSE</StrtNm>
+                                    <BldgNb>51</BldgNb>
+                                    <PstCd>8500</PstCd>
+                                    <TwnNm>FRAUENFELD</TwnNm>
+                                    <Ctry>CH</Ctry>
+                                </PstlAdr>
+                            </UltmtDbtr>
+                        </RltdPties>
+                        <RmtInf>
+                            <Strd>
+                                <CdtrRefInf>
+                                    <Tp>
+                                        <CdOrPrtry>
+                                            <Prtry>QRR</Prtry>
+                                        </CdOrPrtry>
+                                    </Tp>
+                                    <Ref>000000012419300043982409061</Ref>
+                                </CdtrRefInf>
+                                <AddtlRmtInf>RECHNUNG NR.1241930 VOM 06.09.2024</AddtlRmtInf>
+                            </Strd>
+                        </RmtInf>
+                        <RltdDts>
+                            <AccptncDtTm>2026-04-07T00:00:00.000+02:00</AccptncDtTm>
+                        </RltdDts>
+                    </TxDtls>
+                </NtryDtls>
+            </Ntry>
+        </Ntfctn>
+    </BkToCstmrDbtCdtNtfctn>
+</Document>
+

@@ -1,0 +1,1295 @@
+@A+
+@C+
+@I:Eml_Define
+@I:Eml_Global
+
+//=================================================================================================
+// FrameRezise
+//=================================================================================================
+sub FrameRezise()
+local
+  {
+  tRet : int;
+  tCte : handle;
+  }
+{
+tRet # Lib_Json:LoadPrc(var tCte,'_U_'+Lib_User:GetId()+'_UI');
+
+$Eml_gtLeft->wpWidth # Lib_Json:ReadInt(tCte,'Eml/LeftWidth');
+$Eml_gtList->wpWidth # Lib_Json:ReadInt(tCte,'Eml/ListWidth');
+
+}
+
+//=================================================================================================
+// FrameRezise
+//=================================================================================================
+sub FrameSave()
+local
+  {
+  tCte : handle;
+  tRet : int;
+  }
+{
+tRet # Lib_Json:LoadPrc(var tCte,'_U_'+Lib_User:GetId()+'_UI');
+Lib_Json:WriteInt(tCte,'Eml/LeftWidth',$Eml_gtLeft->wpWidth);
+Lib_Json:WriteInt(tCte,'Eml/ListWidth',$Eml_gtList->wpWidth);
+Lib_Json:SavePrc(tCte,'_U_'+Lib_User:GetId()+'_UI');
+}
+
+
+//=================================================================================================
+// Globale Variablen und Ordner
+//=================================================================================================
+sub SetGlobal
+  (
+  aTempFolder : logic;
+  )
+local
+  {
+  tCalTime : CalTime;
+  tYear : int;
+  tMonth : int;
+  }
+{
+//--- Var ---------------------------------------
+VarAllocate(EmailGlobal);
+tCalTime->vmServerTime();
+tMonth # tCalTime->vpMonth;
+tYear # tCalTime->vpYear;
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+//--- Globale Variablen | Ordner  ---------------
+if(aTempFolder = true)
+  {
+  gTempPath # Mdl_Lib:CreateTempFolder('eml');
+  }
+gUserCurrent # CnvIA(UserInfo(_UserCurrent));
+gUserId # Eml_Lib:GetUserId();
+FsiPathCreate(Lib_Sys:DbP()+'GlobalCom');
+FsiPathCreate(Lib_Sys:DbP()+'Preferences');
+//--- Lizenz ------------------------------------
+gLicenseNumber # StrCut(DbaLicense(_DbaSrvLicense),1,10);
+// gLicenseNumber # 'CS153650WN'; // parfin de siecle
+//--- Speicherort Archiv ------------------------
+FsiPathCreate(Lib_Sys:DbP()+'Emails');
+FsiPathCreate(Lib_Sys:DbP()+'Emails\'+CnvAI(tYear,_FmtNumNoGroup));
+if (tMonth = 12)
+  {
+  FsiPathCreate(Lib_Sys:DbP()+'Emails\'+CnvAI(tYear+1,_FmtNumNoGroup));
+  }
+//--- UnreadCount -------------------------------
+gUnreadCount # CteOpen(_CteTree);
+}
+
+//=================================================================================================
+// Print
+//=================================================================================================
+sub Print()
+{
+return;
+WinWbnExecCommand($WebNavigator,_WinWbnCommandExecPrint); //stefan Achtung nicht für 5.7 geeignet
+}
+
+
+//=================================================================================================
+// InitGlobal2() für Modules
+//=================================================================================================
+sub InitGlobal
+  (
+  aFrmMain : handle;
+  aFrmTray : handle;
+  aTempPath : alpha(100);
+  )
+local
+  {
+  tCalTime : CalTime;
+  tYear : int;
+  tMonth : int;
+  }
+{
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+
+//--- Var ---------------------------------------
+VarAllocate(EmailGlobal);
+
+gFrmTray # aFrmTray;
+gFrmMain # aFrmMain;
+gAccCreated # true;
+gTempPath # aTempPath
+
+tCalTime->vmServerTime();
+tMonth # tCalTime->vpMonth;
+tYear # tCalTime->vpYear;
+
+
+
+gUserCurrent # CnvIA(UserInfo(_UserCurrent));
+gUserId # Eml_Lib:GetUserId();
+FsiPathCreate(Lib_Sys:DbP()+'GlobalCom');
+FsiPathCreate(Lib_Sys:DbP()+'Preferences');
+
+//--- Lizenz ------------------------------------
+gLicenseNumber # StrCut(DbaLicense(_DbaSrvLicense),1,10);
+// gLicenseNumber # 'CS153650WN'; // parfin de siecle
+//--- Speicherort Archiv ------------------------
+FsiPathCreate('Emails');
+FsiPathCreate('Emails\'+CnvAI(tYear,_FmtNumNoGroup));
+if (tMonth = 12)
+  {
+  FsiPathCreate('Emails\'+CnvAI(tYear+1,_FmtNumNoGroup));
+  }
+//--- UnreadCount -------------------------------
+gUnreadCount # CteOpen(_CteTree);
+
+
+}
+
+//=================================================================================================
+// InitUI()
+//=================================================================================================
+sub InitUI
+  (
+  aFrmMain : handle;
+  )
+local
+  {
+  tFsiMonitor : handle;
+  tFont : font;
+  tNodeId : int;
+  tAccTreeId : int;
+  }
+{
+
+//--- Fsi Monitor ---------------------
+Mdl_Main:SetInitText('SwissMail Fsi-Monitor');
+
+//--- Job ---------------------------------------
+Mdl_Main:SetInitText('SwissMail init Jobs');
+Eml_Server:StartAll(aFrmMain);
+
+//--- Tree ----------------------------
+Mdl_Main:SetInitText('SwissMail init Account Tree');
+gtvAcc # $tvAcc;
+gtvAcc->WinTreeNodeRemove(true);
+Eml_Acc:SetTree(0,gtvAcc);
+gtvAcc->wpAutoUpdate # true;
+
+
+tFont:Attributes # _WinFontAttrNormal;
+gtvAcc->wpIndexFont(0) # tFont;
+tFont:Attributes # _WinFontAttrBold;
+gtvAcc->wpIndexFont(1) # tFont;
+gtvAcc->wpIndexColFg(0) # sBlack;
+gtvAcc->wpIndexColFg(1) # sBlue1;
+
+
+//--- Erstes Postfach Eingang selektieren -------
+tNodeId # Eml_Lib:GetFirstChild(gUserId,0,gAccMainId);
+gtvAcc->WpCurrentInt # Eml_Acc:IdToNode(tNodeId);
+
+//--- Set Vars ------------------------------------
+tAccTreeId # tNodeId;
+gAccId # Eml_Lib:GetFirstChild(gUserId,0,tAccTreeId);
+gAccRootId # Eml_Lib:GetParent(gAccId);
+gAccType # Eml_Lib:GetType(gAccId);
+gAccTreeId # tAccTreeId;
+gAccTreeType # Eml_Lib:GetType(gAccTreeId);
+
+//--- List --------------------------------------
+Eml_List:SetFilter2('Init');
+
+//--- UI ----------------------------------------
+$deEmail->cpiEditMode # 1;
+
+//--- Einstellungen für CtxDocEdit Anzeige ------
+$deEmail->cplTableGridLines # false;
+
+}
+
+//=================================================================================================
+// Init() für Modules
+//=================================================================================================
+sub Init
+  (
+  aFrmMain : handle;
+  aFrmTray : handle;
+  aTempPath : alpha(100);
+  )
+local
+  {
+  }
+{
+InitGlobal(aFrmMain,aFrmTray,aTempPath);
+InitUI(aFrmMain);
+
+//--- Pref --------------------------------------
+Eml_Pref:Start(var gPref,gUserId);
+Eml_Pref:EmlFrmOpenModule(gPref,gFrmMain,var gAccountWidth,gUserID);
+
+
+//--- Star UI -----------------------------------
+FrameRezise();
+}
+
+//=================================================================================================
+// Term()
+//=================================================================================================
+sub Term()
+local
+  {
+  }
+{
+//--- Preferences -------------------------------
+Eml_Pref:EmlFrmCloseModul(gPref,gFrmMain,gAccountWidth,gUserID);
+Eml_Pref:Save(gPref,gUserID);
+
+//--- Term UI -----------------------------------
+FrameSave();
+}
+
+
+//=================================================================================================
+// Globale zurücksetzen
+//=================================================================================================
+sub ResetGlobal()
+{
+VarFree(EmailGlobal);
+}
+
+//=================================================================================================
+// Einstellungen Applikation
+//=================================================================================================
+sub SetApp()
+{
+//--- App --------------------------------------
+_App->wpOleDropModeRelaxed # true;
+_App->wpTileTheme # _WinTileThemeEnhanced;
+_App->wpTileSize(_WinTypeTreeView) # 16;
+_App->wpDialogBoxLeft # WinInfo(0,_WinScreenWidth)/2-150;
+_App->wpDialogBoxTop # WinInfo(0,_WinScreenHeight)/2-100;
+//--- Ctx Doc Editor ----------------------------
+if (!_App->wpInstallCtxDocEdit)
+  _App->wpInstallCtxDocEdit # true;
+//dbgStefan if (!_App->wpInstallCtxDocEdit)
+//dbgStefan   {
+//dbgStefan   // DocEdit-Erweiterung nicht installiert
+//dbgStefan
+//dbgStefan   Ui.InfoDialog:constructor('{"FrameCaption":"SwissMail","Text1" : "SwissText Erweiterung konnte nicht installiert werden.","Text2" : "Die Anwendung wird beendet."}');
+//dbgStefan
+//dbgStefan
+//dbgStefan   WinHalt();
+//dbgStefan   }
+}
+
+//=================================================================================================
+// ChangeListView()
+//=================================================================================================
+sub ChangeListView()
+{
+$miListTop->wpMenuCheck # !$miListTop->wpMenuCheck;
+$miListLeft->wpMenuCheck # !$miListLeft->wpMenuCheck;
+$gsEmlList->wpVertical # !$gsEmlList->wpVertical;
+}
+
+
+
+//=================================================================================================
+// OpenEmail()
+//=================================================================================================
+sub OpenEmail
+  (
+  aAction : alpha(20);
+  )
+{
+switch(aAction)
+  {
+  case 'EmlNew':
+    {
+    Doc_Main:Clone(aAction,511,0,'','','','',true,1,gAccId);
+    return;
+    }
+  case 'EmlOpen','EmlReply','EmlReplyAll','EmlForward':
+    {
+    if(gAttBlocked or gLinksBlocked or gImagesBlocked)
+      return;
+    Doc_Main:Clone(aAction,511,gEmlId,'','','','',true,1,gAccId);
+    return;
+    }
+  case 'EmlEdit':
+    {
+    if(gAttBlocked or gLinksBlocked or gImagesBlocked)
+      return;
+    Doc_Main:Clone(aAction,511,gEmlId,'','','','',false,1,gAccId);
+      return;
+    }
+  default : return;
+  }
+
+}
+
+//=================================================================================================
+// Alle E-Mails downloaden
+//=================================================================================================
+sub EmlDownload()
+local
+  {
+  tRet : int;
+  qAcc : handle;
+  tFilter : handle;
+  tFrame : handle;
+  }
+{
+SysClone(_CloneStandard,'Eml_Download','/aVisible=true /c16splashon=n');
+}
+
+//=================================================================================================
+// Clone
+//=================================================================================================
+sub Clone()
+{
+SysClone(_CloneStandard,'Eml_Main','/aClone=true /c16splashon=n');
+}
+
+//=================================================================================================
+// Main()
+//=================================================================================================
+main()
+local
+  {
+  tUser : handle;
+  tFirstName : alpha(250);
+  tLastName : alpha(250);
+  tFsiMonitor : handle;
+  tLet : logic;
+  tRet : int;
+  tWinState : int;
+  tFont : font;
+  tNode : handle;
+  tAccTreeId : int;
+  tAccId : int;
+  }
+{
+//bgConnect('*',n,n);
+//--- Error -------------------------------------
+ErrCall('Eml_Error');
+
+//--- Clone -------------------------------------
+if (SysGetArg('aClone') = '')
+  {
+  //--- SwissMail starten -----------------------
+  SysClone(_CloneStandard,'Eml_Main','/aClone=true /c16splashon=n');
+  return;
+  }
+
+//--- DB Path -----------------------------------
+Lib_Sys:DbP();
+
+//--- App ---------------------------------------
+SetApp();
+//--- Global ------------------------------------
+SetGlobal(true);
+
+//--- Version -----------------------------------
+tLet # Eml_Version();
+
+//--- Open --------------------------------------
+gFrmTray # WinOpen('Eml_Tray',_WinOpenDialog);
+_App->wpTrayFrame # gFrmTray;
+gFrmTray->wpCaption # 'SwissMail  '+sVersion;
+gFrmSplash # WinOpen('Eml_Splash',_WinOpenDialog);
+WinDialogRun(gFrmSplash,_WinDialogCenterScreen | _WinDialogAsync);
+gFrmMain # WinOpen('Eml_Main',_WinOpenDialog);
+gFrmMain->wpVisible # false;
+
+//--- Email Header ------------------------------
+Eml_Init:EmailHeader(0);
+
+//--- Email Button UI ---------------------------
+Eml_Init:EmailButton(0,0,false,false,false);
+
+//--- Pref --------------------------------------
+Eml_Pref:Start(var gPref,gUserId);
+Eml_Pref:EmlFrmOpenOld(gPref,gFrmMain,var gAccountWidth,gUserID);
+
+//--- User --------------------------------------
+UserInfo(_UserCurrent);
+tUser # UrmOpen(_UrmTypeUser,0,UserInfo(_UserName));
+tUser->UrmPropGet(_UrmPropFirstName,tFirstName);
+tUser->UrmPropGet(_UrmPropLastName,tLastName);
+
+//--- Global ------------------------------------
+gFrmMain->wpCaption # 'SwissMail   |   '+tFirstName+' '+tLastName+'   ( '+UserInfo(_UserName)+' : '+CnvAI(gUserCurrent)+' )';
+$miListTop->wpMenuCheck # true;
+gRecList # $RecList;
+$RecList->wpDbFileNo # 0;
+$RecList->wpDbKeyNo # 0;
+if(gUserId =^ 'forrer')
+  {
+  $btDemo->wpVisible # true;
+  $btSelect->wpVisible # true;
+  }
+//--- Fsi Monitor -------------------------------
+tFsiMonitor # gFrmMain->FsiMonitorOpen(0,0);
+tFsiMonitor->FsiMonitorAdd(Lib_Sys:DbP()+'GlobalCom');
+tFsiMonitor->FsiMonitorControl(_FsiMonitorStart);
+
+//--- Tree --------------------------------------
+gtvAcc # $tvAcc;
+gtvAcc->WinTreeNodeRemove(true);
+Eml_Acc:SetTree(0,gtvAcc);
+gtvAcc->wpAutoUpdate # true;
+tFont:Attributes # _WinFontAttrNormal;
+gtvAcc->wpIndexFont(0) # tFont;
+tFont:Attributes # _WinFontAttrBold;
+gtvAcc->wpIndexFont(1) # tFont;
+gtvAcc->wpIndexColFg(0) # sBlack;
+gtvAcc->wpIndexColFg(1) # sBlue1;
+
+//--- Erstes Postfach Eingang selektieren -------
+tAccTreeId # Eml_Lib:GetFirstChild(gUserId,0,gAccMainId);
+gtvAcc->WpCurrentInt # Eml_Acc:IdToNode(tAccTreeId);
+
+//--- Set Vars ----------------------------------
+tAccId # Eml_Lib:GetFirstChild(gUserId,0,tAccTreeId);
+gAccRootId # Eml_Lib:GetParent(tAccId);
+gAccType # Eml_Lib:GetType(tAccId);
+gAccTreeId # tAccTreeId;
+gAccTreeType # Eml_Lib:GetType(gAccTreeId);
+gAccId # tAccId;
+
+//--- Run ---------------------------------------
+WinDialogRun(gFrmMain);
+
+gFrmMain->WinClose();
+ResetGlobal();
+//--- Halt --------------------------------------
+WinHalt();
+}
+
+//=================================================================================================
+// Created
+//=================================================================================================
+sub EvtCreated
+  (
+  aEvt : event;        // Ereignis
+  ): logic;
+local
+  {
+  tNode : handle;
+  tRet : int;
+  tFont : font;
+  tAccTreeId : int;
+  tAccId : int;
+  }
+{
+
+
+//--- Einstellungen für CtxDocEdit Anzeige ------
+$deEmail->cplTableGridLines # false;
+
+
+//--- List --------------------------------------
+Eml_List:SetFilter2('Init');
+
+//--- Job ---------------------------------------
+Eml_Server:StartAll(gFrmMain);
+
+//--- UI ----------------------------------------
+$deEmail->cpiEditMode # 1;
+gAccCreated # true;
+
+
+//--- Splash Screen -----------------------------
+WinClose(gFrmSplash);
+gFrmMain->wpVisible # true;
+return(true);
+}
+
+//=================================================================================================
+// EvtClose()
+//=================================================================================================
+sub EvtClose
+(
+  aEvt : event;        // Ereignis
+) : logic;
+
+local
+{
+  tDirHdl : handle;
+  tName   : alpha(250);
+  tRet    : int;
+}
+{
+
+//-----------------------------------------------
+// Nachfrage vor dem Schließen
+//-----------------------------------------------
+tRet # WinDialogBox(gFrmMain, 'SwissMail','Möchten Sie SwissMail wirklich beenden?', _WinIcoQuestion, _WinDialogYesNo, _WinIdNo);
+
+if (tRet != _WinIdYes)
+  return(false);   // Schließen abbrechen
+
+
+//-----------------------------------------------
+// Preferences
+//-----------------------------------------------
+Eml_Pref:EmlFrmCloseOld(gPref,gFrmMain,gAccountWidth,gUserID);
+Eml_Pref:Save(gPref,gUserID);
+
+//-----------------------------------------------
+// Temp Folder
+//-----------------------------------------------
+Mdl_Lib:DeleteTempFolder(gTempPath);
+
+//-----------------------------------------------
+// Job stoppen
+//-----------------------------------------------
+Eml_Server:StopAll();
+
+//-----------------------------------------------
+// Tray schließen
+//-----------------------------------------------
+WinClose(_App->wpTrayFrame);
+_App->wpTrayFrame # 0;
+
+//-----------------------------------------------
+return(true);   // Anwendung darf schließen
+}
+
+//=================================================================================================
+// Click()
+//=================================================================================================
+sub EvtClicked
+  (
+  aEvt                 : event;    // Ereignis
+  ): logic;
+local
+  {
+  tCteNodeMsgs        : handle;
+  tCteNodeMsg         : handle;
+  tButton : alpha(32);
+  tCount : int;
+  tReturn : int;
+  tHistory : handle;
+  tError : int;
+  tAccId : int;
+  tErr : int;
+  tSize : int;
+  tJobID : int;
+  }
+{
+tCteNodeMsgs # CteOpen(_CteNode, _CteChildList);
+tButton # aEvt:obj->wpCustom;
+switch(tButton)
+  {
+  case 'reply' : OpenEmail('EmlReply');
+  case 'replyAll' : OpenEmail('EmlReplyAll');
+  case 'forward' : OpenEmail('EmlForward');
+  case 'open' : OpenEmail('EmlOpen');
+  case 'new' :  OpenEmail('EmlNew');
+  case 'edit' :  OpenEmail('EmlEdit');
+  /*case 'AcountView' :
+    {
+    if ($gtAcount->wpWidth > 0)
+      $gtAcount->wpWidth # 0;
+    else
+      $gtAcount->wpWidth # 2000;
+    }*/
+  case 'EmlDownload' :
+    {
+    Eml_Server:WakeupAll();
+    }
+  case 'Contact' : Eml_Contact(gAccId);
+  case 'btImgShow' : Eml_Content:ImgShow(gEmlId);
+  case 'btImgContactCreate' : Eml_List:CntEdit('new');
+  case 'btNoSpam' : Eml_Content:NoSpam(gEmlId);
+  case 'btPrint' : Print();
+  }
+return(true);
+}
+
+
+//=================================================================================================
+// EvtMenuCommand()
+//=================================================================================================
+sub EvtMenuCommand
+  (
+  aEvt                 : event;    // Ereignis
+  aMenuItem            : handle;   // Auslösender Menüpunkt / Toolbar-Button
+  ): logic;
+local
+  {
+  tNode : handle;
+  tRet : int;
+  tMenu : alpha(64);
+  tRecIdList : handle;
+  }
+{
+tNode # $tvAcc->wpCurrentInt;
+tRecIdList # Eml_Lib:SelToCte($RecList);
+switch(aMenuItem->wpName)
+  {
+  //--- Ansicht -----------------------------------------------
+  case 'miListLeft':
+    {
+    if ($miListLeft->wpMenuCheck = false)
+      {
+      ChangeListView();
+      }
+    }
+  case 'miListTop':
+    {
+    if ($miListTop->wpMenuCheck = false)
+      {
+      ChangeListView();
+      }
+    }
+  //--- Export -------------------------------------------------
+  case 'miExportPdf' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'pdf',false,true);
+  case 'miExportDoc' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'doc',false,true);
+  case 'miExportDocX' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'docx',false,true);
+  case 'miExportTxt' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'txt',false,true);
+  case 'miExportEml' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'eml',false,true);
+  case 'miExportHtml' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'html',false,true);
+  case 'miExportRtf' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'rtf',false,true);
+  case 'miExportOrg' : Eml_Export(gFrmMain,0,tRecIdList,'',gEmlSubject,'org',false,true);
+  //--- Nachricht ----------------------------------------------
+  case 'miEmlReply' : OpenEmail('EmlReply');
+  case 'miEmlReplyAll' : OpenEmail('EmlReplyAll');
+  case 'miEmlNew' :  OpenEmail('EmlNew');
+  case 'miEmlForward' :  OpenEmail('EmlForward');
+  case 'miEmlOpen' :  OpenEmail('EmlOpen');
+  //--- Postfach -----------------------------------------------
+  case 'miAccNew' : Eml_AccEdit:WinNew();
+
+  case 'miAccAction' :
+                     {
+                     if($Eml_Main > 0)
+                       Eml_Action($Eml_Main,gUserId,gAccRootId,gAccPermIdSct);
+                     else
+                       Eml_Action($Mdl_Main,gUserId,gAccRootId,gAccPermIdSct);
+                     }
+  case 'miAccEdit' : Eml_AccEdit:WinEdit(tNode->wpId);
+  case 'miAccDelete' : Eml_Acc:Delete(tNode->wpId);
+  //--- Extras ----------------------------------
+  case 'miContact' : Eml_Contact(gAccId);
+  case 'miAccPerm' : Eml_AccPerm();
+  case 'miShortcutEdit' : Eml_Shortcut(gFrmMain);
+  case 'miPrefDialog' : Eml_PrefDialog(gFrmMain,gPref,gUserId);
+  //--- Info ---------------------------------------------------
+  case 'miAppInfo' : Eml_Info();
+  }
+return(true);
+}
+
+//=================================================================================================
+// Popup()
+//=================================================================================================
+sub EvtMenuInitPopup
+  (
+  aEvt                 : event;    // Ereignis
+  aMenuItem            : handle;   // Auslösender Menüeintrag
+  ): logic;
+{
+switch(aMenuItem->wpName)
+  {
+  case 'miView' :
+    {
+    if(!$gsEmlList->wpVertical)
+      $miListLeft->wpMenuCheck # true;
+    else
+      $miListTop->wpMenuCheck # true;
+    }
+  case 'miDatei' :
+    {
+    if (gEmlId = 0)
+      {
+      $miExportPdf->wpDisabled # true;
+      $miExportDoc->wpDisabled # true;
+      $miExportTxt->wpDisabled # true;
+      $miExportHtml->wpDisabled # true;
+      $miExportOrg->wpDisabled # true;
+      }
+    else
+      {
+      $miExportPdf->wpDisabled # false;
+      $miExportDoc->wpDisabled # false;
+      $miExportTxt->wpDisabled # false;
+      $miExportHtml->wpDisabled # false;
+      $miExportOrg->wpDisabled # false;
+      }
+    }
+  case 'miExport' :
+    {
+    if(gEmlType = 0)
+      $miExportOrg->wpDisabled # false;
+    else
+      $miExportOrg->wpDisabled # true;
+    }
+  case 'miAcc' :
+    {
+    //--- Postfach erstellen --------------------------------------------------
+    if (Eml_AccPerm:GetEditorPermCount(gUserId) > 0 or gUserId =^ 'forrer')
+      {
+      $miAccNew->wpDisabled # false;
+      $miAccAction->wpDisabled # false;
+      }
+    else
+      {
+      $miAccNew->wpDisabled # true;
+      $miAccAction->wpDisabled # true;
+      }
+    //--- Rechteverwaltung -----------------------
+    if (Eml_AccPerm:GetOwnerPermCount(gUserId) > 0)
+      $miAccPerm->wpDisabled # false;
+    else
+      $miAccPerm->wpDisabled # true;
+
+    //--- Postfach bearbeiten ---------------------------------------------
+    switch(true)
+      {
+      case ('forrer' =^ gUserId):
+        {
+        $miAccEdit->wpDisabled # false;
+        $miAccDelete->wpDisabled # false;
+        }
+      case (Eml_Lib:FindFilter(512,'EAC.FltOwner',gAccRootId,0,gUserId)):
+        {
+        $miAccEdit->wpDisabled # false;
+        $miAccDelete->wpDisabled # false;
+        }
+      case (Eml_Lib:FindFilter(512,'EAC.FltEdit',gAccRootId,0,gUserId)):
+        {
+        $miAccEdit->wpDisabled # false;
+        $miAccDelete->wpDisabled # true;
+        }
+      default :
+        {
+        $miAccEdit->wpDisabled # true;
+        $miAccDelete->wpDisabled # true;
+        }
+      }
+    }
+  }
+return(true);
+}
+
+//=================================================================================================
+// Event Fsi Monitor
+//=================================================================================================
+sub EvtFsiMonitor
+  (
+  aEvt                 : event;    // Ereignis
+  aAction              : int;      // Dateioperation
+  aFileName            : alpha;    // Dateiname
+  aFileAttrib          : int;      // Dateiattribute
+  aFileSize            : bigint;   // Dateigröße
+  aFileCT              : caltime;  // Datum-/Uhrzeit der Änderung
+  aFileNameOld         : alpha;    // Alter Dateiname beim Umbenennen
+  ): logic;
+{
+if (aAction = 3 or aAction = 1)
+  {
+  Eml_Redraw:FsiMonitor(aFileName);
+  }
+return(true);
+}
+
+//=================================================================================================
+// Key()
+//=================================================================================================
+sub EvtKeyItem
+  (
+  aEvt                  : event;        // Ereignis
+  aKey                  : int;          // Taste
+  aID                   : int;          // RecID bei RecList, Node-Deskriptor bei TreeView, Focus-Objekt bei Frame und AppFrame
+  ): logic;
+local
+  {
+  tObj : handle;
+  }
+{
+tObj # WinFocusGet();
+Switch(aKey)
+  {
+  case 3 : // Delete
+    {
+    if(tObj > 0)
+      {
+      switch(tObj->wpName)
+        {
+        case 'edSearchText' : Eml_Search:ResetSearchText();
+        case 'edSearchEmail' : Eml_Search:ResetSearchEmail();
+        case 'edSearchAddress' : Eml_Search:ResetSearchAddress();
+        }
+      }
+    }
+  case 8 :  Eml_Contact(gAccId); //F4 | Adressbuch
+  case 9 :  Eml_Server:WakeupAll(); // F5 | Download
+  case 1058 :  OpenEmail('EmlReply'); //Ctrl + R |  Reply
+  case 1054 :  OpenEmail('EmlNew'); //Ctrl + N |  New
+  case 1046 :  OpenEmail('EmlForward'); //Ctrl + F |  Forward
+  case 1043 :  Eml_Content:WebNavigator('Copy'); //Ctrl + C | Copy
+  case 1041 :  Eml_Content:WebNavigator('SelectAll'); //Ctrl + C | Copy
+  case 1052 : ChangeListView(); //Ctrl + L | Listendarstellung
+  case 1055 : OpenEmail('EmlOpen'); //Ctrl + O | Open
+  case 1056 : Print(); //Ctrl + P | Print
+  }
+return(true);
+}
+
+
+
+//=================================================================================================
+// Job()
+//=================================================================================================
+sub EvtJob
+  (
+  aEvt                  : event;        // Ereignis
+  aJobCtrlHdl           : handle;       // Job-Kontroll-Objekt
+  )
+  : logic;
+local
+  {
+  tText : alpha(4095);
+  }
+{
+Eml_Server:FrmError(aJobCtrlHdl);
+return(true);
+}
+
+//=================================================================================================
+// EvtMenuInitPopupShortcut()
+//=================================================================================================
+sub EvtMenuInitPopupShortcut
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüeintrag
+  ): logic;
+local
+  {
+  qShortcut : handle;
+  tFilter : handle;
+  tRet : int;
+  tTerm1 : alpha(100);
+  tOperator : alpha(100);
+  tCount : int;
+  tMenu : handle;
+  tMenuDel : handle;
+  tKey : alpha(16);
+  }
+{
+//--- Menu ----------------------------------
+tMenu # $mbShortcut->WinInfo(_WinMenu);
+if (tMenu = 0)
+  tMenu # $mbShortcut->WinInfo(_WinContextMenu);
+//--- DB ---------------------------------------
+tFilter # RecFilterCreate(514,2);
+tFilter->RecFilterAdd(2,_FltAnd,_FltEq,gUserID);
+qShortcut # RecBufCreate(514);
+for tRet # RecRead(qShortcut,2,_RecFirst,tFilter);
+loop tRet # RecRead(qShortcut,2,_RecNext,tFilter);
+while(tRet = 0)
+  {
+  Inc(tCount);
+  tKey # Eml_Lib:KeyToStr(qShortcut->EMS.KeyMove);
+  tMenu->WinMenuItemAdd('miShortcut'+sCnvAI(qShortcut->EMS.ShortcutId),tKey+' :   '+Eml_Shortcut:pubGetActionValue(qShortcut->EMS.ShortcutId));
+  }
+tMenu->WinMenuItemAdd('miShortcutEdit','[Schnelltasten bearbeiten]');
+tMenuDel # tMenu->WinInfo(_WinFirst);
+tMenuDel->WinMenuItemRemove();
+return(true);
+}
+
+//=================================================================================================
+// EvtMenuCommandShortcut()
+//=================================================================================================
+sub EvtMenuCommandShortcut
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüpunkt / Toolbar-Button
+  ): logic
+local
+  {
+  tMenu : alpha(50);
+  tRecIdList : handle;
+  }
+{
+tMenu # aMenuItem->wpName;
+if(tMenu = 'miShortcutEdit')
+  {
+  Eml_Shortcut(gFrmMain);
+  }
+else
+  {
+  tRecIdList # Eml_Lib:SelToCte($RecList);
+  Eml_ActionExecute:pubRunShortcut(tRecIdList,CnvIA(StrCut(tMenu,11,StrLen(tMenu)-10)),gAccId);
+  }
+return(true);
+}
+
+//=================================================================================================
+// EvtClickedShortcut()
+//=================================================================================================
+sub EvtClickedShortcut
+  (
+  aEvt                  : event;        // Ereignis
+  ): logic;
+{
+aEvt:Obj->WinMenuContext('Eml_Shortcut',0,30);
+
+return(true);
+}
+
+//=================================================================================================
+// EvtMenuInitPopupAction()
+//=================================================================================================
+sub EvtMenuInitPopupAction
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüeintrag
+  ): logic;
+local
+  {
+  qAction : handle;
+  tFilter : handle;
+  tRet : int;
+  tTerm1 : alpha(100);
+  tOperator : alpha(100);
+  tCount : int;
+  tMenu : handle;
+  tMenuDel : handle;
+  }
+{
+//--- Menu ----------------------------------
+tMenu # $mbAction->WinInfo(_WinMenu);
+if (tMenu = 0)
+  tMenu # $mbAction->WinInfo(_WinContextMenu);
+//--- DB ---------------------------------------
+tFilter # RecFilterCreate(513,2);
+tFilter->RecFilterAdd(2,_FltAnd,_FltEq,Eml_Lib:GetParent(gAccId));
+tFilter->RecFilterAdd(3,_FltAnd,_FltEq,false);
+qAction # RecBufCreate(513);
+for tRet # RecRead(qAction,2,_RecFirst,tFilter);
+loop tRet # RecRead(qAction,2,_RecNext,tFilter);
+while(tRet = 0)
+  {
+  Inc(tCount);
+  tMenu->WinMenuItemAdd('miAction'+sCnvAI(qAction->EMA.ActionId),CnvAI(qAction->EMA.ActionId)+': '+Eml_Action:GetActionValue(qAction->EMA.ActionId));
+  }
+//if(tCount = 0)
+  //tMenu->WinMenuItemAdd('miEmpty'+sCnvAI(qAction->EMA.ActionId),'[keine Aktionen vorhanden]');
+tMenu->WinMenuItemAdd('miAccEdit','[Aktionen bearbeiten]');
+tMenuDel # tMenu->WinInfo(_WinFirst);
+tMenuDel->WinMenuItemRemove();
+return(true);
+}
+
+//=================================================================================================
+// EvtClickedAction()
+//=================================================================================================
+sub EvtClickedAction
+  (
+  aEvt                  : event;        // Ereignis
+  ): logic;
+{
+aEvt:Obj->WinMenuContext('Eml_Action',0,30);
+return(true);
+}
+
+//=================================================================================================
+// EvtMenuCommandAction()
+//=================================================================================================
+sub EvtMenuCommandAction
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüpunkt / Toolbar-Button
+  ): logic
+local
+  {
+  tMenu : alpha(50);
+  tRecIdList : handle;
+  tDelData : handle;
+  }
+{
+tMenu # aMenuItem->wpName;
+if(tMenu = 'miAccEdit')
+  {
+  if($Eml_Main > 0)
+    Eml_Action($Eml_Main,gUserID,gAccRootId,gAccPermIdSct);
+  else
+    Eml_Action($Mdl_Main,gUserID,gAccRootId,gAccPermIdSct);
+  }
+else
+  {
+  tDelData # $RecList->wpSelData;
+  tRecIdList # tDelData->wpData(_WinSelDataCteList);
+  Eml_ActionExecute:pubRunActionFromMenu(tRecIdList,CnvIA(StrCut(tMenu,9,StrLen(tMenu)-8)),gAccId);
+  }
+return(true);
+}
+
+//=================================================================================================
+// Doppelklick
+//=================================================================================================
+sub AttEvtMouseItem
+  (
+  aEvt      : event; // Ereignis
+  aButton   : int;   // Maustaste
+  aHitTest  : int;   // Hittest-Code
+  aItem     : int;   // Spalte oder Gantt-Interval
+  aID       : int;   // RecID nur bei RecList
+  ) : logic;
+{
+
+$dlAtt->WinLstCellGet(gAttType,1,aID);
+$dlAtt->WinLstCellGet(gAttPathFile,3,aID);
+$dlAtt->WinLstCellGet(gAttMemNumber,4,aID);
+
+if ((aButton = _WinMouseLeft | _WinMouseDouble) and aID != 0)
+  {
+  Eml_Att:pubOpen(gAttType,gAttPathFile,gAttMemNumber,gEmlType,gAttBlocked,var gAttMem);
+  }
+return(true);
+}
+
+//=================================================================================================
+// Context
+//=================================================================================================
+sub AttEvtMenuContext
+  (
+  aEvt                 : event;    // Ereignis
+  aHittest             : int;      // Hittest-Code
+  aItem                : handle;   // Spalte oder Gantt-Intervall
+  aID                  : int;      // Rec-ID bei RecList, Zeile bei DataList
+  ): logic;
+{
+if (aID=0)
+  return(false);
+else
+  return(true);
+}
+
+//=================================================================================================
+// Context
+//=================================================================================================
+sub AttEvtMenuInitPopup
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüeintrag
+  ): logic;
+local
+  {
+  tAttCount : int;
+  }
+{
+tAttCount # $dlAtt->WinLstDatLineInfo(_WinLstDatInfoCount);
+Switch(true)
+  {
+  case (tAttCount = 1) : $miSaveAll->wpDisabled # true;
+  case (tAttCount > 1) : $miSaveAll->wpDisabled # false;
+  default : $miSaveAll->wpDisabled # true;
+  }
+if (gAttBlocked)
+  {
+  $miOpen->wpDisabled # true;
+  $miSaveAs->wpDisabled # true;
+  $miSaveAll->wpDisabled # true;
+  }
+return(true);
+}
+
+//=================================================================================================
+// Menu Command
+//=================================================================================================
+sub AttEvtMenuCommand
+  (
+  aEvt                  : event;        // Ereignis
+  aMenuItem             : handle;       // Auslösender Menüpunkt / Toolbar-Button
+  ): logic;
+{
+switch(aMenuItem->wpName)
+  {
+  case 'miOpen':  Eml_Att:pubOpen(gAttType,gAttPathFile,gAttMemNumber,gEmlType,gAttBlocked,var gAttMem);
+  case 'miSaveAs': Eml_Att:pubSave(gAttPathFile,gAttMemNumber,gEmlType,var gAttMem);
+  case 'miSaveAll': Eml_Att:pubSaveAll(gTempPath,true,false,gEmlId);
+  }
+
+return(true);
+}
+
+//=================================================================================================
+// Drag Init
+//=================================================================================================
+sub AttEvtDragInit
+  (
+  aEvt                 : event;    // Ereignis
+  aDataObject          : handle;   // Drag-Datenobjekt
+  aEffect              : int;      // R?ckgabe der erlaubten Effekte (_WinDropEffectNone = Cancel)
+  aMouseBtn            : int;      // Verwendete Maustasten (optional)
+  aDataPlace           : handle;
+  ): logic;
+local
+  {
+  tDataText : handle;
+  tList : handle;
+  tContent : handle;
+  tMem : handle;
+  tAttMemNumber : int;
+  tFileName : alpha(512);
+  }
+{
+aEvt:obj->WinLstCellGet(tAttMemNumber,4,aDataPlace->wpArgInt(0));
+aEvt:obj->WinLstCellGet(tFileName,3,aDataPlace->wpArgInt(0));
+tFileName # FsiSplitName(tFileName,_FsiNameNE);
+tFileName # Mdl_Lib:StrFileName(tFileName);
+if(tAttMemNumber = 0)
+  return(true);
+tMem # gAttMem[tAttMemNumber];
+
+aDataObject->wpFormatEnum(_WinDropDataContent) # true;
+aEffect # _WinDropEffectCopy | _WinDropEffectMove;
+tList # CteOpen(_CteList);
+tList->CteInsertItem(tFileName,tMem,'');
+tContent # aDataObject->wpData(_WinDropDataContent);
+tContent->wpData # tList;
+return(true);
+}
+
+//=================================================================================================
+// EvtUser()
+//=================================================================================================
+sub EvtUser
+  (
+  aEvt                  : event;        // Ereignis
+  aEventID              : word;         // Benutzerdefinierte Ereignis-Nummer
+  aArgument1            : int;          // Numerisches Argument
+  aArgument2            : alpha;        // Alphanumerisches Argument
+  ): logic;
+local
+  {
+  tCteHeader : handle;
+  tAuthorization : logic;
+  tUserId : alpha;
+  tAccRootId : int;
+  tEmlId : int;
+  tAccId : int;
+  tFrmActionExecutePos : rect;
+  }
+{
+switch(aEventID)
+  {
+  case 1 : //=== Action =========================
+    {
+    //--- Global --------------------------------
+    tUserId # Eml_Lib:GetUserId();
+    tAccRootId # gAccRootId;
+    tEmlId # gEmlId;
+    tAccId # gAccId;
+    tFrmActionExecutePos # gFrmActionExecutePos;
+    //--- Berechtigung --------------------------
+    switch(true)
+      {
+      case ('forrer' =^ tUserId): tAuthorization # true;
+      case (Eml_Lib:FindFilter(512,'EAC.FltOwner',tAccRootId,0,tUserId)): tAuthorization # true;
+      case (Eml_Lib:FindFilter(512,'EAC.FltEdit',tAccRootId,0,tUserId)):  tAuthorization # true;
+      default :  tAuthorization # false;
+      }
+    if(tAuthorization)
+      {
+      //--- Read Header -------------------------
+      tCteHeader # CteOpen(_CteNode,_CteChildList);
+      tCteHeader->spFlags # _CteAttribList | _CteAttribTreeCI;
+      Eml_Mime:pubReadHeader(tEmlId,tCteHeader);
+      //--- Action ------------------------------
+      Eml_ActionExecute(1,tAccId,tEmlId,tCteHeader);
+      Eml_ActionExecute(0,tAccId,tEmlId,tCteHeader,gFrmActionExecutePos);
+      //--- End ---------------------------------
+      CteClose(tCteHeader);
+      }
+    }
+  }
+return(true);
+}
+
+
+//=================================================================================================
+// ActionEvtPosChanged()
+//=================================================================================================
+sub ActionEvtPosChanged
+  (
+  aEvt                  : event;        // Ereignis
+  aRect                 : rect;         // Größe des Fensters
+  aClientSize           : point;        // Größe des Client-Bereichs
+  aFlags                : int;          // Aktion
+  )
+  : logic;
+{
+if(aRect:left  != 0)
+  {
+  gFrmActionExecutePos # aRect;
+  }
+return(true);
+}
+
+//=================================================================================================
+// EvtPosGroupSplit()
+//=================================================================================================
+sub EvtPosGroupSplit
+(
+aEvt                  : event;        // Ereignis
+aRect                 : rect;         // Größe des Fensters
+aClientSize           : point;        // Größe des Client-Bereichs
+aFlags                : int;          // Aktion
+): logic;
+
+local
+  {
+  tInt : int;
+  }
+{
+if(gAccCreated)
+  {
+  if(gClientSize:x != aClientSize:x)
+    {
+    gClientSize # aClientSize;
+    gAccPosChange # 1;
+    if(gAccountWidth = 0)
+      gAccountWidth # $gtAcount->wpAreaRight - $gtAcount->wpAreaLeft;
+    tInt # ((gAccountWidth * 10000) / (aClientSize:x));
+    if (tInt > 9999)
+      tInt # 9999;
+    $gtAcount->wpWidth # tInt;
+    }
+  }
+return(true);
+}
+
+//=================================================================================================
+// EvtPosAccount()
+//=================================================================================================
+sub EvtPosAccount
+  (
+  aEvt                  : event;        // Ereignis
+  aRect                 : rect;         // Grösse des Fensters
+  aClientSize           : point;        // Grösse des Client-Bereichs
+  aFlags                : int;          // Aktion
+  ): logic;
+{
+
+if(gAccCreated)
+  {
+  if (gAccPosChange = 0)
+    {
+    if(gAccClientSize:x != aClientSize:x)
+      {
+      gAccClientSize # aClientSize;
+      gAccountWidth # $gtAcount->wpAreaRight - $gtAcount->wpAreaLeft;
+      }
+    }
+  else
+    Dec(gAccPosChange);
+  }
+return(true);
+}

@@ -1,0 +1,1 @@
+droid --resume 3d30c7bb-eeaa-4d9c-87eb-3512f8b06ed0
