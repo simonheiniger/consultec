@@ -1,0 +1,791 @@
+@C+
+@A+
+
+
+//=================================================================================================
+// getPref()
+//=================================================================================================
+sub getPref
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+}
+{
+  tRet # Lib_Json:TextToJson('_phonePref',var tJson);
+  if(tRet < 0)
+  {
+     tRet # Lib_Json:LoadPrc(var tJson,'_phonePref');
+     tRet # Lib_Json:SaveText(tJson,'_phonePref');
+  }
+
+  Lib_Json:WriteAlpha(tJson,'version',Lib_Mod:GetVersion('phone'));
+  if(Lic_Lib:getLicByOptionId(601))
+    Lib_Json:InsertAlpha(tJson,'stock','OK');
+  if(Lic_Lib:getLicByOptionId(602))
+    Lib_Json:InsertAlpha(tJson,'wau','OK');
+  if(Lic_Lib:getLicByOptionId(603))
+    Lib_Json:InsertAlpha(tJson,'qrInvoice','OK');
+    
+  //--- System ----------------------------
+  tRet # RecRead(997,1,_RecFirst)
+  if("sys-office" = true)
+    Lib_Json:InsertAlpha(tJson,'appName','SwissOffice');
+  else
+    Lib_Json:InsertAlpha(tJson,'appName','SwissGarage');
+    
+  //--- Lizenzen -------------------------
+  //qOptions # RecBufCreate(954)
+  
+  
+
+  Lib_Json:JsonToMem(tJson,var tJsonOut);
+
+  Lib_Mem:Insert(tJsonOut,1,'{"data":{"getPref":');
+  Lib_Mem:AlphaAppend(tJsonOut,'}}');
+
+  return(true);
+}
+
+
+
+//=================================================================================================
+// createInvoice()
+//=================================================================================================
+sub createInvoice
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tCode : alpha(4096);
+  tMem : handle;
+  tFind : int;
+  tQrInvoice : logic;
+  tBR : alpha(2);
+  tCodeMem : handle;
+}
+{
+  tCode # Lib_Json:ReadAlpha(aJsonIn,'createInvoice/code');
+  
+  //--- Stadard br einf?gen --------------------------
+  tBR # StrChar(13)+StrChar(10);
+  tCode # Lib_Str:rep(tCode,tBR,StrChar(10),true);
+  tCode # Lib_Str:rep(tCode,StrChar(10),tBR,true);
+  
+  //--- Validation File --------------------------------
+  if('d'+'bg' = 'live')
+  {
+    tCodeMem # Lib_Mem:alphaToMem(tCode)
+    Lib_Mem:Convert(tCodeMem,_sys->spCharset,_CharsetUTF8)
+    
+    Lib_File:MemToFile(tCodeMem,'C:/C16/QR.txt')
+  }
+ 
+  //--- Check Code -----------------------------------
+  if(StrCut(tCode,1,3) =^ 'SPC')
+    tQrInvoice # true
+  
+  //--- schon vorhanden -----------------------------
+  if(tQrInvoice)
+  {
+    Lib_Text:TextToMem('QR',var tMem)
+    tFind # MemFindStr(tMem,1,tMem->spLen,tCode,_StrCaseIgnore)
+    MemFree(tMem);
+
+    if(tFind = 0)
+      tRet # Lib_Text:AlphaToText(tCode,'QR');
+  }
+  
+  
+  switch(true)
+  {
+    case !tQrInvoice : tCode # 'WRONG';
+    case tFind > 0 : tCode # 'EXISTING';
+    case tRet = 0 : tCode # 'OK';
+    default : tCode # 'FALSE'
+  }
+  
+  
+  
+  tJsonOut # Lib_Mem:AlphaToMem('{"data":{"createInvoice":{');
+  Lib_Mem:AlphaAppend(tJsonOut,'"code":"'+tCode+'"');
+  Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+
+  return(true);
+}
+
+
+//=================================================================================================
+// updateArticle()
+//=================================================================================================
+sub updateArticle
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tArticleNummer : alpha;
+  qStock : handle;
+  tQuantity : float;
+}
+{
+  tArticleNummer # Lib_Json:ReadAlpha(aJsonIn,'updateArticle/articleNumber');
+  tQuantity # Lib_Json:ReadFloat(aJsonIn,'updateArticle/quantity');
+  qStock # RecBufCreate(101);
+  qStock->"LEI-Bestellnummer" # StrCnv(tArticleNummer,_StrLetterExt | _StrLower);
+  qStock->"LEI-Lager" # true;
+  tRet # RecRead(qStock,4,0);
+  
+  if(!(qStock->"LEI-Bestellnummer" = tArticleNummer and qStock->"LEI-Lager" = true))
+    return(false);
+ 
+  CallOld('LAG-Inventar',tArticleNummer,tQuantity);
+  
+  tRet # RecRead(qStock,1,0);
+  if(tRet != 0)
+    RecBufClear(qStock);
+  
+  
+  tJsonOut # Lib_Mem:AlphaToMem('{"data":{"updateArticle":{');
+  Lib_Mem:AlphaAppend(tJsonOut,'"articleNummer":"'+qStock->"LEI-Bestellnummer"+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"caption":"'+qStock->"LEI-Bezeichnung1"+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"quantity":"'+CnvAF(qStock->"LEI-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2)+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"unit":"'+qStock->"LEI-Einheit"+'"');
+
+  
+  
+  Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+
+  return(true);
+}
+
+//=================================================================================================
+// getOrder()
+//=================================================================================================
+sub getOrder
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderNummer : int;
+  qOrder : handle;
+  qOrderItem : handle;
+  qFahrzeug : handle;
+  qAdresse : handle;
+  tItemCount : int;
+}
+{
+  tOrderNummer # Lib_Json:ReadInt(aJsonIn,'getOrder/orderNumber');
+  qOrder # RecBufCreate(150);
+  qOrderItem # RecBufCreate(962);
+  qFahrzeug # RecBufCreate(30);
+  qAdresse # RecBufCreate(1);
+  
+  qOrder->"WAU-DatIdt" # tOrderNummer
+  tRet # RecRead(qOrder,1,0);
+  
+  if(tRet = 0)
+  {
+    tRet # RecLink(qFahrzeug,qOrder,2,_RecFirst);
+    if(tRet!= 0)
+      RecBufClear(qFahrzeug);
+    tRet # RecLink(qAdresse,qOrder,1,_RecFirst);
+    if(tRet!= 0)
+      RecBufClear(qAdresse);
+    
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"getOrder":{');
+      Lib_Mem:AlphaAppend(tJsonOut,'"orderNumber":"'+CnvAI(qOrder->"WAU-DatIdt",_FmtNumNoGroup)+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"modell":"'+qFahrzeug->"FAZ-Fahrzeugtyp"+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"marke":"'+qFahrzeug->"FAZ-Marke"+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"kundeVorname":"'+qAdresse->"ADR-Vorname"+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"kundeNachname":"'+qAdresse->"ADR-Name"+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"items":[');
+        for tRet # RecLink(qOrderItem,qOrder,12,_RecLast);
+        loop tRet # RecLink(qOrderItem,qOrder,12,_RecPrev);
+        while(tRet = 0)
+        {
+          Inc(tItemCount);
+          Lib_Mem:AlphaAppend(tJsonOut,'{');
+          Lib_Mem:AlphaAppend(tJsonOut,'"id":'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+',');
+          Lib_Mem:AlphaAppend(tJsonOut,'"artikelNummer":"'+qOrderItem->"WAL-Artikelnummer"+'",');
+          Lib_Mem:AlphaAppend(tJsonOut,'"name":"'+qOrderItem->"WAL-Bezeichnung"+'",');
+          Lib_Mem:AlphaAppend(tJsonOut,'"quantity":'+CnvAF(qOrderItem->"WAL-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2));
+          Lib_Mem:AlphaAppend(tJsonOut,'},');
+        }
+        if(tItemCount > 0)
+          tJsonOut->spLen # tJsonOut->spLen-1;
+        
+      Lib_Mem:AlphaAppend(tJsonOut,']');
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"getOrder":{}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  
+  RecBufDestroy(qOrder);
+  RecBufDestroy(qOrderItem);
+  
+  return(true);
+}
+
+//=================================================================================================
+// getOrderItem()
+//=================================================================================================
+sub getOrderItem
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderNummer : int;
+  qOrderItem : handle;
+  qFahrzeug : handle;
+  tOrderId : int;
+  tItemCount : int;
+}
+{
+  tOrderNummer # Lib_Json:ReadInt(aJsonIn,'getOrderItem/orderId');
+  tOrderId # Lib_Json:ReadInt(aJsonIn,'getOrderItem/orderItemId');
+  qOrderItem # RecBufCreate(962);
+
+  qOrderItem->"WAL-WAU DatIdt" # tOrderNummer
+  qOrderItem->"WAL-Position" # tOrderId
+  tRet # RecRead(qOrderItem,1,0);
+  
+  if(tRet = 0)
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"getOrderItem":{');
+
+    Inc(tItemCount);
+    Lib_Mem:AlphaAppend(tJsonOut,'"id":'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+',');
+    Lib_Mem:AlphaAppend(tJsonOut,'"artikelNummer":"'+qOrderItem->"WAL-Artikelnummer"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"name":"'+qOrderItem->"WAL-Bezeichnung"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"quantity":'+CnvAF(qOrderItem->"WAL-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2));
+
+
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"getOrderItem":{}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  
+  RecBufDestroy(qOrderItem);
+  
+  return(true);
+}
+
+//=================================================================================================
+// updateOrderItem()
+//=================================================================================================
+sub updateOrderItem
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderNummer : int;
+  qOrderItem : handle;
+  qFahrzeug : handle;
+  tOrderId : int;
+  tItemCount : int;
+  tQuantity : float;
+}
+{
+  tOrderNummer # Lib_Json:ReadInt(aJsonIn,'updateOrderItem/orderId');
+  tOrderId # Lib_Json:ReadInt(aJsonIn,'updateOrderItem/orderItemId');
+  tQuantity # Lib_Json:ReadFloat(aJsonIn,'updateOrderItem/quantity');
+  
+  qOrderItem # RecBufCreate(962);
+
+  qOrderItem->"WAL-WAU DatIdt" # tOrderNummer
+  qOrderItem->"WAL-Position" # tOrderId
+  tRet # RecRead(qOrderItem,1,_RecLock );
+  
+  if(tRet = 0)
+  {
+    // update Order
+    qOrderItem->"WAL-Anzahl" # tQuantity;
+    RecReplace(qOrderItem,_RecUnlock)
+    
+    // CallOld('WAU-Lager');  // Argumente: WAU-DatIdt,LEI-Bestellnummer,Anzahl
+    
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"updateOrderItem":{');
+
+    Inc(tItemCount);
+    Lib_Mem:AlphaAppend(tJsonOut,'"id":'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+',');
+    Lib_Mem:AlphaAppend(tJsonOut,'"artikelNummer":"'+qOrderItem->"WAL-Artikelnummer"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"name":"'+qOrderItem->"WAL-Bezeichnung"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"quantity":'+CnvAF(qOrderItem->"WAL-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2));
+
+
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"updateOrderItem":{}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  
+  RecBufDestroy(qOrderItem);
+  
+  return(true);
+}
+
+
+//=================================================================================================
+// modifyOrderItem()
+//=================================================================================================
+sub modifyOrderItem
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderId : int;
+  qLeistungen : handle;
+  tArtikelNummer : alpha(4096);
+  tItemCount : int;
+  tQuantity : float;
+  tDifference : float;
+  qOrderItem : handle;
+  qOrderItemLast : handle;
+  tLastPosition : int;
+}
+{
+  //bgconnect('*',n,n);
+  
+  
+  tOrderId # Lib_Json:ReadInt(aJsonIn,'modifyOrderItem/orderId');
+  tArtikelNummer # Lib_Json:ReadAlpha(aJsonIn,'modifyOrderItem/artikelNummer');
+  tQuantity # Lib_Json:ReadFloat(aJsonIn,'modifyOrderItem/quantity');
+  
+  qLeistungen # RecBufCreate(101);
+  qOrderItem # RecBufCreate(962);
+  qOrderItemLast # RecBufCreate(962);
+  
+  qLeistungen->"LEI-Bestellnummer" # tArtikelNummer
+  
+
+  tRet # RecRead(qLeistungen,4,0);
+  if(tArtikelNummer = qLeistungen->"LEI-Bestellnummer")
+  {
+    CallOld('WAU-Lager',tOrderId,tArtikelNummer,tQuantity);  // Argumente: WAU-DatIdt,LEI-Bestellnummer,Anzahl
+    tRet  # 0
+  }
+  else
+    tRet # -1
+
+
+  if(tRet = 0)
+  {
+
+    
+    
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"modifyOrderItem":{');
+
+    Inc(tItemCount);
+    Lib_Mem:AlphaAppend(tJsonOut,'"id":'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+',');
+    Lib_Mem:AlphaAppend(tJsonOut,'"artikelNummer":"'+qOrderItem->"WAL-Artikelnummer"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"name":"'+qOrderItem->"WAL-Bezeichnung"+'",');
+    Lib_Mem:AlphaAppend(tJsonOut,'"quantity":'+CnvAF(qOrderItem->"WAL-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2));
+
+
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"modifyOrderItem":{}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  RecBufDestroy(qLeistungen);
+  RecBufDestroy(qOrderItem);
+  
+  
+  return(true);
+}
+
+//=================================================================================================
+// insertOrderItem()
+//=================================================================================================
+sub insertOrderItem
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderNummer : int;
+  qOrder : handle;
+  qOrderItem : handle;
+  tOrderItemId : int;
+}
+{
+  tOrderNummer # Lib_Json:ReadInt(aJsonIn,'insertOrderItem/orderNumber');
+  tOrderItemId # Lib_Json:ReadInt(aJsonIn,'insertOrderItem/orderItemId');
+  
+  
+  qOrder # RecBufCreate(150);
+  qOrderItem # RecBufCreate(962);
+  
+  qOrder->"WAU-DatIdt" # tOrderNummer
+  tRet # RecRead(qOrder,1,0);
+  
+  if(tRet = 0)
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"insertOrderItem":{');
+      Lib_Mem:AlphaAppend(tJsonOut,'"orderNumber":"'+CnvAI(qOrder->"WAU-DatIdt",_FmtNumNoGroup)+'",');
+      Lib_Mem:AlphaAppend(tJsonOut,'"items":[');
+        for tRet # RecLink(qOrderItem,qOrder,12,_RecFirst);
+        loop tRet # RecLink(qOrderItem,qOrder,12,_RecNext);
+        while(tRet = 0)
+        {
+          Lib_Mem:AlphaAppend(tJsonOut,'{');
+          Lib_Mem:AlphaAppend(tJsonOut,'"item'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+'":{');
+          Lib_Mem:AlphaAppend(tJsonOut,'"id":'+CnvAI(qOrderItem->"WAL-Position",_FmtNumNoGroup)+',');
+          Lib_Mem:AlphaAppend(tJsonOut,'"name":"'+qOrderItem->"WAL-Bezeichnung"+'"');
+          Lib_Mem:AlphaAppend(tJsonOut,'},');
+        }
+        tJsonOut->spLen # tJsonOut->spLen-1;
+        
+      Lib_Mem:AlphaAppend(tJsonOut,']');
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"insertOrderItem":{}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  
+  RecBufDestroy(qOrder);
+  RecBufDestroy(qOrderItem);
+  
+  return(true);
+}
+//=================================================================================================
+// deleteOrderItem()
+//=================================================================================================
+
+sub deleteOrderItem
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+
+local
+{
+  tRet : int;
+  tJson : handle;
+  tOrderNummer : int;
+  qOrderItem : handle;
+  tOrderId : int;
+}
+
+{
+  tOrderNummer # Lib_Json:ReadInt(aJsonIn,'deleteOrderItem/orderId');
+  tOrderId # Lib_Json:ReadInt(aJsonIn,'deleteOrderItem/orderItemId');
+  
+  qOrderItem # RecBufCreate(962);
+  qOrderItem->"WAL-WAU DatIdt" # tOrderNummer;
+  qOrderItem->"WAL-Position" # tOrderId;
+  tRet # RecRead(qOrderItem,1,_RecLock);
+  
+  if(tRet = 0)
+  {
+    // L?sche das Item
+    RecDelete(qOrderItem,_RecUnlock);
+    
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"deleteOrderItem":{');
+    Lib_Mem:AlphaAppend(tJsonOut,'"success":true');
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  else
+  {
+    tJsonOut # Lib_Mem:AlphaToMem('{"data":{"deleteOrderItem":{');
+    Lib_Mem:AlphaAppend(tJsonOut,'"success":false');
+    Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  }
+  
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+  
+  RecBufDestroy(qOrderItem);
+  
+  return(true);
+}
+
+//=================================================================================================
+// getArticle()
+//=================================================================================================
+sub getArticle
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tJson : handle;
+  tArticleNummer : alpha;
+  qStock : handle;
+}
+{
+
+  tArticleNummer # StrCut(Lib_Json:ReadAlpha(aJsonIn,'getArticle/articleNumber'),1,20);
+  qStock # RecBufCreate(101);
+  qStock->"LEI-Bestellnummer" # StrCnv(tArticleNummer,_StrLetterExt | _StrLower);
+  qStock->"LEI-Lager" # true;
+  tRet # RecRead(qStock,4,0);
+  
+  if(StrAdj(qStock->"LEI-Bestellnummer",_StrAll) != StrAdj(tArticleNummer,_StrAll))
+    RecBufClear(qStock);
+
+
+  tJsonOut # Lib_Mem:AlphaToMem('{"data":{"getArticle":{');
+  Lib_Mem:AlphaAppend(tJsonOut,'"articleNumber":"'+qStock->"LEI-Bestellnummer"+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"caption":"'+qStock->"LEI-Bezeichnung1"+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"lagerort":"'+qStock->"LEI-Lagerort"+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"quantity":"'+CnvAF(qStock->"LEI-Anzahl",_FmtNumNoGroup | _FmtNumPoint,0,2)+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"price":"'+CnvAF(qStock->"LEI-PreisEinheit",_FmtNumNoGroup | _FmtNumPoint,0,2)+'",');
+  Lib_Mem:AlphaAppend(tJsonOut,'"unit":"'+qStock->"LEI-Einheit"+'"');
+
+  
+  
+  Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+
+  return(true);
+}
+
+
+//=================================================================================================
+// setGlobal()
+//=================================================================================================
+sub setGlobal
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tLet : logic;
+  tName : alpha(80);
+  tValue : int;
+}
+{
+  tName # StrCut(Lib_Json:ReadAlpha(aJsonIn,'setGlobal/name'),1,80);
+  tValue # Lib_Json:ReadInt(aJsonIn,'setGlobal/value');
+
+  tLet # Web_Service:setGlobal(tName,tValue);
+  if(tLet)
+    Lib_Json:AlphaToMemUtf8('{"setGlobal":{"name":"'+tName+'","value":'+CnvAI(tValue,_FmtNumNoGroup)+'}}',var tJsonOut);
+  else
+    Lib_Json:AlphaToMemUtf8('{"setGlobal":{"name":"'+tName+'","value":NULL}}',var tJsonOut);
+
+  return(true);
+}
+
+
+
+//=================================================================================================
+// getGlobal()
+//=================================================================================================
+sub getGlobal
+  (
+  aJsonIn : handle; // cte
+  var tJsonOut : handle; // mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tLet : logic;
+  tName : alpha(80);
+  tValue : alpha(80);
+}
+{
+  tName # StrCut(Lib_Json:ReadAlpha(aJsonIn,'getGlobal/name'),1,80);
+
+  tLet # Web_Service:getGlobal(tName,var tValue);
+  if(tLet)
+    Lib_Json:AlphaToMemUtf8('{"setGlobal":{"name":"'+tName+'","value":"'+tValue+'"}}',var tJsonOut);
+  else
+    Lib_Json:AlphaToMemUtf8('{"setGlobal":{"name":"'+tName+'","value":"false"}}',var tJsonOut);
+  return(true);
+}
+
+
+//=================================================================================================
+// lagBarcode() - Empfängt EAN-Nummer und schreibt sie als String in GV-Barcode
+//                ueber Web_Service:setGlobal. Bei Fehler Fallback in Textdatei 'EAN'.
+//=================================================================================================
+sub lagBarcode
+  (
+  aJsonIn      : handle;
+  var tJsonOut : handle;
+  ) : logic;
+local
+{
+  tRet      : int;
+  tEan      : alpha(80);
+  tEanInt   : int;
+  tSuccess  : logic;
+  tFallback : logic;
+  tMessage  : alpha(255);
+}
+{
+  // Lese EAN-Nummer aus JSON-Input
+  tEan # StrCut(Lib_Json:ReadAlpha(aJsonIn,'lagBarcode/ean'),1,80);
+  tEan # StrAdj(tEan, _StrAll);
+
+  tFallback # false;
+
+  // Konvertiere EAN-String zu int fuer GV-Barcode
+  tEanInt # CnvIA(tEan);
+
+  // Primaer: EAN als int in globale Variable GV-Barcode schreiben
+  tSuccess # Web_Service:setGlobal('GV-Barcode', tEanInt);
+
+  if(tSuccess)
+  {
+    tMessage # 'EAN erfolgreich in GV-Barcode gespeichert';
+  }
+  else
+  {
+    // Fallback: in Textdatei 'EAN' schreiben (alte Logik)
+    tRet # Lib_Text:AlphaToText(tEan,'EAN');
+    if(tRet = 0)
+    {
+      tSuccess  # true;
+      tFallback # true;
+      tMessage  # 'GV-Barcode fehlgeschlagen - EAN in Textdatei gespeichert (Fallback)';
+    }
+    else
+    {
+      tMessage # 'Fehler: weder GV-Barcode noch Textdatei beschreibbar';
+    }
+  }
+
+  // JSON-Antwort
+  tJsonOut # Lib_Mem:AlphaToMem('{"data":{"lagBarcode":{');
+  Lib_Mem:AlphaAppend(tJsonOut,'"ean":"'+tEan+'",');
+
+  if(tSuccess)
+    Lib_Mem:AlphaAppend(tJsonOut,'"success":true,');
+  else
+    Lib_Mem:AlphaAppend(tJsonOut,'"success":false,');
+
+  if(tFallback)
+    Lib_Mem:AlphaAppend(tJsonOut,'"fallback":true,');
+  else
+    Lib_Mem:AlphaAppend(tJsonOut,'"fallback":false,');
+
+  Lib_Mem:AlphaAppend(tJsonOut,'"message":"'+tMessage+'"');
+  Lib_Mem:AlphaAppend(tJsonOut,'}}}');
+
+  Lib_Mem:Convert(tJsonOut,_sys->spCharset,_CharsetUTF8);
+
+  return(true);
+}
+//=================================================================================================
+// main()
+//=================================================================================================
+main
+  (
+  aQuery : alpha(4096);
+  var tJsonOut : handle; // Mem
+  ) : logic;
+local
+{
+  tRet : int;
+  tRef : alpha;
+  tJsonIn : handle; // Cte
+  tJson : alpha(4096);
+  tSchemaName : Alpha;
+  tSchema : handle;
+}
+{
+aQuery # Lib_Str:Rep(aQuery,'__26__','&'); //stefan nicht gut
+
+Lib_Json:AlphaToJson(aQuery,var tJsonIn);
+if(tJsonIn <= 0)
+{
+  Lib_Json:AlphaToMemUtf8('{"error":"Json Parse Error"}',var tJsonOut);
+  return(false);
+}
+
+tSchema # Lib_Json:ReadNode(tJsonIn,'');
+if(tSchema <= 0)
+{
+  Lib_Json:AlphaToMemUtf8('{"error":"Json Parse Error"}',var tJsonOut);
+  return(false);
+}
+
+
+switch(tSchema->spName)
+{
+  //---- Global ---------------------------------
+  case 'getPref' : getPref(tJsonIn,var tJsonOut);
+  
+  //--- Order ----------------------------------
+  case 'getOrder' : getOrder(tJsonIn,var tJsonOut);
+  case 'getOrderItem' : getOrderItem(tJsonIn,var tJsonOut);
+  case 'updateOrderItem' : updateOrderItem(tJsonIn,var tJsonOut);
+  case 'modifyOrderItem' : modifyOrderItem(tJsonIn,var tJsonOut);
+  case 'deleteOrderItem' : deleteOrderItem(tJsonIn,var tJsonOut);
+  
+  
+  //--- Stock -----------------------------------
+  case 'getArticle' : getArticle(tJsonIn,var tJsonOut);
+  case 'updateArticle' : updateArticle(tJsonIn,var tJsonOut);
+  
+  //--- QR Invoice ------------------------------
+  case 'createInvoice' : createInvoice(tJsonIn,var tJsonOut);
+  
+  //--- Barcode Scanner -------------------------
+  case 'lagBarcode' : lagBarcode(tJsonIn,var tJsonOut);
+
+  default : Lib_Json:AlphaToMemUtf8('{"error":"Schema unknown"}',var tJsonOut);
+}
+
+
+return(true)
+}
