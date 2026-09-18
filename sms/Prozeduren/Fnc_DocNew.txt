@@ -1,0 +1,49 @@
+@A+
+@C+
+
+//=================================================================================================
+// main()
+//=================================================================================================
+main
+  (
+  aTableNo : int;
+  aDatId : int;
+  aTemplateDialog : logic;
+  aTemplateFile : alpha(200);
+  aSaveMenuDisabled : logic;
+  opt aSaveAsTemplate : logic;
+  )
+{
+//bgConnect('*',n,n);
+//--- Als Vorlage Speichern ---------------------
+if(aSaveAsTemplate)
+  {
+  "TXT-Vorlage" # true;
+  }
+
+if(aTemplateDialog)
+  {
+  Doc_Templates(
+  aTableNo, // aTableNo : int;
+  aDatId, // aDatId : int;
+  aTemplateFile, // aTemplateFile : alpha(200);
+  aSaveMenuDisabled, // aSaveMenuDisabled : logic;
+  aSaveAsTemplate, // aSaveAsTemplate : logic;
+  '', // aTempPath : alpha(500);
+  false // aNewVersion : logic;
+  );
+  }
+else
+  {
+  Doc_Main(
+    'DocNew',
+    aTableNo,
+    aDatId,
+    aTemplateFile,
+    '',
+    '',
+    '',
+    aSaveMenuDisabled,
+    0);
+  }
+}

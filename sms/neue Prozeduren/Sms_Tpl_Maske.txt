@@ -1,0 +1,82 @@
+Maske "Sms_Tpl" — Vorlagen verwalten
+====================================
+
+Frame im Designer, Name  Sms_Tpl,  Base → Caption: Vorlagen
+AreaWidth 760, AreaHeight 520
+
+Aufruf: Knopf neben "Vorlage:" im Fenster SMS senden, und aus den SMS-Einstellungen.
+Gespeichert wird wie bisher im CONZEPT-Text SMS_VORLAGEN (Blöcke, getrennt durch ---,
+erste Zeile = Titel). Das Format bleibt also gleich, nur die Pflege wird bequemer.
+
+
+Skizze
+------
+
+  +-----------------------------------------------------------------+
+  | Vorlagen                                                    [X] |
+  +-----------------------------------------------------------------+
+  |  Vorlagen              Titel:                                   |
+  |  +------------------+  [ Ihr Auto steht bereit            ]     |
+  |  | Ihr Auto steht.. |                                           |
+  |  | Terminerinnerung |  Text:                                    |
+  |  |   (dlTplList)    |  +-------------------------------------+  |
+  |  |                  |  |          (teTplText)                |  |
+  |  |                  |  |                                     |  |
+  |  +------------------+  +-------------------------------------+  |
+  |  [ Neu ] [ Loeschen ]              84 / 160 - 1 SMS             |
+  |                                                                 |
+  |                              [ Abbrechen ]  [ Speichern ]       |
+  +-----------------------------------------------------------------+
+
+
+Objekte
+-------
+
+  #  Reiter          Objekt    Name          Caption       Left Top  Width Height
+  -- --------------  --------  ------------  ------------  ---- ---- ----- ------
+  1  Ausgabe         Label     lbTplList     Vorlagen         20   15   200    20
+  2  Ansicht         DataList  dlTplList     -                20   40   260   340
+  3  Ausgabe         Label     lbTplTitle    Titel:          300   15   200    20
+  4  Eingabe         Edit      edTplTitle    -               300   40   440    22
+  5  Ausgabe         Label     lbTplTextLb   Text:           300   75   200    20
+  6  Eingabe         TextEdit  teTplText     -               300  100   440   280
+  7  Ausgabe         Label     lbTplCount    -               540  390   200    20
+  8  Schaltflächen   Button    btTplNew      &Neu             20  390   100    25
+  9  Schaltflächen   Button    btTplDel      &Loeschen       130  390   100    25
+  10 Schaltflächen   Button    btTplCancel   &Abbrechen      500  450   110    28
+  11 Schaltflächen   Button    btTplSave     &Speichern      620  450   110    28
+
+  Spalten von dlTplList (Rechtsklick → "Spalten bearbeiten..."):
+    clmTplListTitle   Visible ✓     Breite ca. 240   (Titel)
+    clmTplListText    Visible leer                    (ganzer Text)
+
+Einstellungen:
+  - btTplCancel   Special → TypeButton _WinBtnClose, Id 2
+  - btTplSave     Special → TypeButton NICHT _WinBtnClose (Standard lassen)
+                  Key → Default ✓
+                  Ereignisse → EvtClicked:  Sms_Tpl:EvtClicked
+                  (Der Knopf darf nicht selbst schliessen: erst speichern, dann
+                   schliesst Sms_Tpl:EvtClicked das Fenster.)
+  - btTplNew      Ereignisse → EvtClicked:  Sms_Tpl:EvtClicked
+  - btTplDel      Ereignisse → EvtClicked:  Sms_Tpl:EvtClicked
+  - dlTplList     Ereignisse → EvtMouseItem: Sms_Tpl:EvtMouseItem
+  - teTplText     Ereignisse → EvtChanged:   Sms_Tpl:EvtChanged
+                  Eigenschaften → AutoWrap ✓, LengthMax 160
+                  (Vorlagentext ist ebenfalls auf eine SMS begrenzt)
+  - edTplTitle    Ereignisse → EvtChanged:   Sms_Tpl:EvtChanged
+
+
+Zusätzlich im Fenster "SMS senden" (Maske Sms_Dlg)
+---------------------------------------------------
+
+  12 Schaltflächen  Button  btSmsTplEdit  ...   Left 470, Top 425, Width 30, Height 22
+     Ereignisse → EvtClicked: Sms_Dlg:EvtClicked
+     Öffnet den Vorlagen-Editor; danach wird die Auswahlliste neu gefüllt.
+
+
+Offen
+-----
+Zum Neuaufbau der Liste (nach Löschen oder nach dem Editor) fehlt mir noch der
+CONZEPT-Befehl zum Leeren bzw. Löschen einer Zeile in einer DataList.
+Bekannt sind bisher nur WinLstDatLineAdd, WinLstCellSet, WinLstCellGet,
+WinLstDatLineInfo(_WinLstDatInfoCount) und wpCurrentInt.

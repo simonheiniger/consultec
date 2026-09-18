@@ -1,0 +1,498 @@
+@A+
+@C+
+
+//=================================================================================================
+// MemToHex()
+//=================================================================================================
+sub MemToHex
+  (
+  aMem : handle;
+  var aHex : handle;
+  opt aStart : int;
+  opt aEnd : int;
+  )
+local
+  {
+  tIndex : int;
+  tByteInt : int;
+  tByte : alpha(3);
+  }
+{
+  if(HdlInfo(aHex,_HdlType) = _HdlMem)
+    MemFree(aHex);
+    
+  aHex # MemAllocate(_MemAutoSize);
+
+  if(aStart = 0)
+    tIndex # 1;
+  else
+    tIndex # aStart;
+    
+  if(aEnd = 0)
+    aEnd # aMem->spLen;
+    
+  for tIndex # tIndex;
+  loop inc(tIndex)
+  while(tIndex <= aEnd)
+  {
+    tByteInt # MemReadByte(aMem,tIndex);
+    tByte # cnvAI(tByteInt,_FmtNumHex | _FmtNumLeadZero,0,2)+' ';
+    MemWriteStr(aHex,aHex->spLen+1,tByte);
+  }
+}
+
+//=================================================================================================
+// HexToMem()
+//=================================================================================================
+sub HexToMem
+  (
+  aHex : alpha(4096);
+  var aMem : handle;
+  )
+local
+  {
+  tLen : int;
+  tPointer : int;
+  }
+{
+  if(HdlInfo(aMem,_HdlType) != _HdlMem)
+    aMem # MemAllocate(_Mem4K);
+ 
+  aHex # Lib_Str:Rep(aHex,' ','',true);
+
+  tLen # StrLen(aHex);
+  for tPointer # 1;
+  loop Inc(tPointer,2)
+  while(tPointer < tLen)
+  {
+    MemWriteByte(aMem,aMem->spLen+1,cnvIA(StrCut(aHex,tPointer,2),_FmtNumHex));
+  }
+}
+
+
+//=================================================================================================
+// Convert()
+//=================================================================================================
+sub Convert
+  (
+  aMem : handle;
+  aCharsetSource : int;
+  aCharsetTarget : int;
+  )
+local
+  {
+  tTarget : handle;
+  tLen : int;
+  tPosBegin : int;
+  tPosEnd : int;
+  tPos : int;
+  }
+{
+tTarget # MemAllocate(_MemAutoSize);
+aMem->spCharset # aCharsetSource;
+MemCnv(aMem,tTarget,aCharsetTarget);
+//-----------------------------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+}
+/*
+//=================================================================================================
+// Convert()
+//=================================================================================================
+sub Convert
+  (
+  aMem : handle;
+  aConvertType : int;
+  )
+local
+  {
+  tTarget : handle;
+  tLen : int;
+  tPosBegin : int;
+  tPosEnd : int;
+  tPos : int;
+  }
+{
+tTarget # MemAllocate(_MemAutoSize);
+MemCnv(aMem,tTarget,aConvertType);
+
+//---------------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+}
+*/
+
+//=================================================================================================
+// Insert()
+//=================================================================================================
+sub Insert
+  (
+  aMem : handle;
+  aPosition : int;
+  aInsert : alpha(200);
+  ) : int;
+{
+MemCopy(aMem,aPosition,aMem->spLen-aPosition+1,aPosition+StrLen(aInsert),aMem);
+MemWriteStr(aMem,aPosition,aInsert,_sys->spCharset);
+}
+
+//=================================================================================================
+// Replace()
+//=================================================================================================
+sub Replace
+  (
+  aMem : handle;
+  aOld : alpha(200);
+  aNew : alpha(200);
+  ) : int;
+local
+  {
+  tTarget : handle;
+  tFind : int;
+  tAlpha : alpha(200);
+  tStart : int;
+  tRep : int;
+  }
+{
+if(HdlInfo(aMem,_HdlType) != _HdlMem )
+  return(-1);
+tTarget # MemAllocate(_MemAutoSize);
+tTarget->spCharset # aMem->spCharset;
+tStart # 1
+do
+  {
+  tFind # MemFindStr(aMem,tStart,aMem->spLen-tStart,aOld,_StrCaseIgnore);
+  if (tFind > 0)
+    {
+    tRep # 1;
+    MemCopy(aMem,tStart,tFind-tStart,tTarget->spLen+1,tTarget);
+    MemWriteStr(tTarget,tTarget->spLen+1,aNew,_sys->spCharset);
+    tStart # tFind+StrLen(aOld);
+    }
+  else
+    MemCopy(aMem,tStart,aMem->spLen-tStart+1,tTarget->spLen+1,tTarget);
+  }
+while(tFind != 0)
+//--- End -------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+return(tRep)
+}
+
+
+//=================================================================================================
+// ReplaceByteWithString()
+//=================================================================================================
+sub ReplaceByteWithString
+  (
+  aMem : handle;
+  aOld : int;
+  aNew : alpha(200);
+  ) : int;
+local
+  {
+  tTarget : handle;
+  tFind : int;
+  tAlpha : alpha(200);
+  tStart : int;
+  tRep : int;
+  }
+{
+if(HdlInfo(aMem,_HdlType) != _HdlMem )
+  return(-1);
+tTarget # MemAllocate(_MemAutoSize);
+tTarget->spCharset # aMem->spCharset;
+tStart # 1
+do
+  {
+  tFind # MemFindStr(aMem,tStart,aMem->spLen-tStart,StrChar(aOld),_StrCaseIgnore);
+  if (tFind > 0)
+    {
+    tRep # 1;
+    MemCopy(aMem,tStart,tFind-tStart,tTarget->spLen+1,tTarget);
+    MemWriteStr(tTarget,tTarget->spLen+1,aNew,_sys->spCharset);
+    tStart # tFind+1;
+    }
+  else
+    MemCopy(aMem,tStart,aMem->spLen-tStart+1,tTarget->spLen+1,tTarget);
+  }
+while(tFind != 0)
+//--- End -------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+return(tRep)
+}
+
+//=================================================================================================
+// RepByte
+//=================================================================================================
+sub RepByte
+  (
+  aMem : handle;
+  aOld : int;
+  aNew : int;
+  aRepAll : logic;
+  ) : int;
+local
+  {
+  tFind : int;
+  tStart : int;
+  tRep : int;
+  }
+{
+tStart # 1
+do
+  {
+  tFind # MemFindByte(aMem,tStart,aMem->spLen-tStart+1,aOld);
+  if (tFind > 0)
+    {
+    Inc(tRep);
+    MemWriteByte(aMem,tFind,aNew);
+    tStart # tFind+1;
+    if(!aRepAll)
+      break;
+    }
+  }
+while(tFind != 0)
+return(tRep)
+}
+
+//=================================================================================================
+// AlphaToMem
+//=================================================================================================
+sub AlphaToMem
+  (
+  aAlpha : alpha(4096);
+  opt aSize : int;
+  ) : handle;
+local
+  {
+  tMem : handle;
+  tLen : int;
+  }
+{
+if(aSize = 0)
+  aSize # _MemAutoSize;
+tMem # MemAllocate(aSize);
+MemWriteStr(tMem,1,aAlpha);
+return(tMem);
+}
+
+//=================================================================================================
+// AlphaAppend
+//=================================================================================================
+sub AlphaAppend
+  (
+  aMem : handle;
+  aAlpha : alpha(4096);
+  ) : int;
+{
+MemWriteStr(aMem,aMem->spLen+1,aAlpha);
+return(ErrGet());
+}
+
+//=================================================================================================
+// MemToAlpha
+//=================================================================================================
+sub MemToAlpha
+  (
+  aMem : handle;
+  ) : alpha;
+local
+  {
+  tAlpha : alpha(4096);
+  tLen : int;
+  }
+{
+if(HdlInfo(aMem,_HdlType) != 30)
+  return '';
+  
+tLen # aMem->spLen;
+if(tLen > 4096)
+  tLen # 4096
+tAlpha # MemReadStr(aMem,1,tLen);
+return(tAlpha);
+}
+
+//=================================================================================================
+// MemToCaption()
+//=================================================================================================
+sub MemToCaption
+  (
+  aMem : int;
+  aObj : handle;
+  ): logic;
+local
+  {
+  tRet : int;
+  tStart : handle;
+  tCount : int;
+  tFrame : int;
+  }
+{
+tFrame # 4000;
+tStart # 1;
+aObj->wpCaption # '';
+for tCount # tFrame;
+loop Inc(tCount,tFrame)
+while(tCount < aMem->spLen)
+  {
+  aObj->wpCaption # aObj->wpCaption+MemReadStr(aMem,tStart,tFrame);
+  tStart # tCount+1;
+  }
+aObj->wpCaption # aObj->wpCaption+MemReadStr(aMem,tStart,aMem->spLen-tStart+1);
+return(true);
+}
+
+//=================================================================================================
+// Base64ToMem()
+//=================================================================================================
+sub Base64ToMem
+  (
+  aMem : handle;
+  )
+local
+  {
+  tTarget : handle;
+  tStart : int;
+  tEnd : int;
+  tFind : int;
+  tError : int;
+  }
+{
+//--- remove CRLF ------------------------------------------
+tStart # 1;
+tTarget # MemAllocate(_MemAutoSize);
+do
+  {
+  tFind # aMem->MemFindStr(tStart,aMem->spLen-tStart,StrChar(13)+StrChar(10));
+  if (tFind=0)
+    tEnd # aMem->spLen+1;
+  else
+    tEnd # tFind;
+  aMem->MemCopy(tStart,tEnd-tStart,tTarget->spLen+1,tTarget);
+  tStart # tFind+2;
+  }
+while (tFind != 0);
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+//--- remove ' ' ------------------------------------------
+tStart # 1;
+tTarget # MemAllocate(_MemAutoSize);
+do
+  {
+  tFind # aMem->MemFindStr(tStart,aMem->spLen-tStart,'====');
+  if (tFind=0)
+    tEnd # aMem->spLen+1;
+  else
+    tEnd # tFind;
+  aMem->MemCopy(tStart,tEnd-tStart,tTarget->spLen+1,tTarget);
+  tStart # tFind+1;
+  }
+while (tFind != 0);
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+//--- Convert ----------------------------
+tTarget # MemAllocate(_MemAutoSize);
+try
+  {
+  ErrTryCatch(_ErrAll,true);
+  ErrTryIgnore(_ErrAll);
+  aMem->MemCnv(tTarget, _MemDecBase64);
+  }
+tError # ErrGet();
+if (tError = 0)
+  {
+  MemWriteByte(aMem,1,0,aMem->spLen);
+  aMem->spLen # 0;
+  MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+  }
+tTarget->MemFree();
+}
+
+
+//=================================================================================================
+// QpToMem()
+//=================================================================================================
+sub QpToMem
+  (
+  aMem : handle;
+  aRemoveUnderline : logic;
+  )
+local
+  {
+  tTarget : handle;
+  tLen : int;
+  tPosBegin : int;
+  tPosEnd : int;
+  tPos : int;
+  }
+{
+tTarget # MemAllocate(_MemAutoSize);
+tLen # aMem->spLen;
+if (tLen > 0)
+  {
+  tPosBegin # 1;
+  do
+    {
+    tPosEnd # aMem->MemFindStr(tPosBegin, tLen - tPosBegin + 1, '=');
+    if (tPosEnd > 0)
+      Dec(tPosEnd);
+    else
+      tPosEnd # tLen;
+    if (tPosEnd >= tPosBegin)
+      {
+      aMem->MemCopy(tPosBegin, tPosEnd - tPosBegin + 1, _MemAppend, tTarget);
+      tPos # tPosBegin;
+      }
+    if (tLen - tPosEnd >= 3)
+      {
+      try
+        {
+        ErrTryIgnore(_ErrAll);
+        aMem->MemReadStr(tPosEnd + 2, 2);
+        tTarget->MemWriteByte(_MemAppend, CnvIA(aMem->MemReadStr(tPosEnd + 2, 2), _FmtNumHex));
+        }
+      ErrSet(0);
+      }
+    tPosBegin # tPosEnd + 4;
+    }
+  while (tPosBegin <= tLen);
+  }
+//--- Unterstrich durch Leerzeichen ersetzen -----------------
+tPos # 1;
+if (aRemoveUnderline)
+  {
+  do
+    {
+    tPos # tTarget->MemFindStr(tPos, tPosEnd - tPos + 1, '_');
+    if (tPos > 0)
+      {
+      tTarget->MemWriteStr(tPos, ' ');
+      Inc(tPos);
+      }
+    else
+      break;
+    }
+  while (tPos != 0);
+  }
+//---------------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+}
+
+

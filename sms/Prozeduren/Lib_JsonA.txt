@@ -1,0 +1,1091 @@
+@A+
+@C+
+
+//-------------------------------------------------------------------------------------------------
+// __Convert()
+//-------------------------------------------------------------------------------------------------
+sub __Convert
+(
+  aMem : handle;
+  aCharsetSource : int;
+  aCharsetTarget : int;
+)
+local
+{
+  tTarget : handle;
+  tLen : int;
+  tPosBegin : int;
+  tPosEnd : int;
+  tPos : int;
+}
+{
+  tTarget # MemAllocate(_MemAutoSize);
+  aMem->spCharset # aCharsetSource;
+  MemCnv(aMem,tTarget,aCharsetTarget);
+
+  MemWriteByte(aMem,1,0,aMem->spLen);
+  aMem->spLen # 0;
+  MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+  tTarget->MemFree();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// __FileToMem()
+//-------------------------------------------------------------------------------------------------
+sub __FileToMem
+(
+  aFilePNE : alpha(200);
+  var aMem : handle;
+  opt aCharsetFile : int;
+): logic;
+local
+{
+  tRet : int;
+  tFsi : handle;
+}
+{
+  if(aCharsetFile = 0)
+   aCharsetFile #  _CharsetUTF8;
+   
+   
+  tFsi # FsiOpen(aFilePNE,_FsiAcsR);
+  if(tFsi <= 0)
+    return(false);
+
+  aMem # MemAllocate(FsiSize(tFsi)+100);
+  tRet # FsiReadMem(tFsi,aMem,1,FsiSize(tFsi));
+  FsiClose(tFsi);
+  
+  __Convert(aMem,aCharsetFile ,_sys->spCharset)
+
+  if(tRet > 0)
+    return(true);
+  else
+    return(false);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// __StrRep
+//-------------------------------------------------------------------------------------------------
+sub __StrRep
+(
+  aStr : alpha(4096);
+  aRep : alpha(100);
+  aIns : alpha(100);
+  opt aAll : logic;
+) : alpha;
+local
+{
+  tStart : int;
+  tLen : int;
+  tFind : int;
+  tInsLen : int;
+}
+{
+  tInsLen # StrLen(aIns);
+  tStart # 1;
+  for tFind # StrFind(aStr,aRep,tStart,_StrCaseIgnore)
+  loop tFind # StrFind(aStr,aRep,tStart,_StrCaseIgnore)
+  while(tFind != 0)
+    {
+    aStr # StrDel(aStr,tFind,StrLen(aRep));
+    aStr # StrIns(aStr,aIns,tFind);
+    if (aAll = false)
+      break;
+    tStart # tFind+tInsLen;
+    }
+  return(aStr);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// __goToPath
+//-------------------------------------------------------------------------------------------------
+sub __goToPath
+(
+  aJson : handle;
+  aPath : alpha;
+): handle;
+local
+{
+  tFind : int;
+  tStart : int;
+  tEnd : int;
+  tPath : alpha(4096);
+  tToken : alpha;
+  tIndex : int;
+  tItem : handle;
+  tCount : int;
+  tItem2 : handle;
+}
+{
+  if(aJson <= 0)
+    return(0);
+    
+    
+  if(aPath = '')
+  {
+    tItem # aJson->CteRead(_CteChildList | _CteFirst);
+    return(tItem);
+  }
+  
+  tItem # aJson;
+  aPath # __StrRep(aPath,'.','/',true);
+  
+  tStart # 1;
+  for tFind # StrFindRegEx(aPath,'[\[\(]',tStart)
+  loop tFind # StrFindRegEx(aPath,'[\[\(]',tStart)
+  while(tFind > 0)
+  {
+    tPath # StrCut(aPath,tStart,tFind-tStart)
+    tItem # tItem->CteRead(_CteNodePath, 0,tPath);
+    if(tItem <= 0)
+      return(0);
+    
+    tEnd # StrFindRegEx(aPath,'[\]\)]',tStart)
+    
+    
+    //--- Index --------------------------
+    tIndex # CnvIA(StrCut(aPath,tFind+1,tEnd-tFind-1))
+    tCount # 1;
+    for tItem2 # tItem->CteRead(_CteFirst);
+    loop tItem2 # tItem->CteRead(_CteNext,tItem2);
+    while(tItem2 > 0 and tCount < tIndex)
+    {
+      Inc(tCount);
+    }
+    tItem # tItem2;
+    tStart # tEnd+1;
+  }
+  if(tItem <= 0)
+      return(0);
+
+  tPath # StrCut(aPath,tStart,StrLen(aPath)-tStart+1);
+  if(tPath != '')
+    tItem # tItem->CteRead(_CteNodePath, 0,tPath);
+  
+  return(tItem);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// FileToJson()
+//-------------------------------------------------------------------------------------------------
+sub FileToJson
+(
+  aFilePNE : alpha(200);
+  aCte : int;
+): logic;
+local
+{
+  tRet : int;
+  tMem : handle;
+}
+{
+
+  __FileToMem(aFilePNE,var tMem)
+
+  aCte # CteOpen(_CteNode);
+  aCte->spID # _JsonNodeObject;
+  tRet # JsonLoad(aCte,'',0,tMem);
+  if(tRet = 0)
+    return(true);
+  else
+    return(false);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ReadNode()
+//-------------------------------------------------------------------------------------------------
+sub ReadNode
+(
+  aCte : int;
+  aPath : alpha(4096);
+  aReturn : int;
+)
+local
+{
+  tItem : int;
+}
+{
+  tItem # __goToPath(aCte,aPath)
+  aReturn #  tItem;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ReadAlpha()
+//-------------------------------------------------------------------------------------------------
+sub ReadAlpha
+(
+  aCte : int;
+  aPath : alpha(64);
+  aReturn : alpha
+)
+local
+  {
+  tItem : int;
+  }
+{
+  tItem # __goToPath(aCte,aPath);
+  if(tItem = 0)
+  {
+    aReturn # '';
+    return;
+  }
+  
+  if(tItem->spType != _TypeAlpha)
+  {
+    aReturn # '';
+    return;
+  }
+    
+  aReturn # tItem->spValueAlpha;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ReadInt()
+//-------------------------------------------------------------------------------------------------
+sub ReadInt
+(
+  aCte : int;
+  aPath : alpha(64);
+  aReturn : int;
+)
+local
+{
+  tItem : int;
+}
+{
+  tItem # __goToPath(aCte,aPath);
+  if(tItem <= 0)
+  {
+    aReturn # 0;
+    return;
+  }
+    
+  if(tItem->spType != _TypeInt)
+  {
+    aReturn # 0;
+    return;
+  }
+
+  aReturn # tItem->spValueInt;
+}
+
+
+
+//-------------------------------------------------------------------------------------------------
+// ReadNum()
+//-------------------------------------------------------------------------------------------------
+sub ReadNum
+(
+  aCte : int;
+  aPath : alpha(64);
+  aReturn : float;
+)
+local
+{
+  tItem : int;
+}
+{
+  tItem # __goToPath(aCte,aPath);
+  if(tItem <= 0)
+  {
+    aReturn # 0.0;
+    return;
+  }
+
+  if(tItem->spType = _TypeInt)
+  {
+    aReturn # CnvFI(tItem->spValueInt);
+    return;
+  }
+ 
+  
+  if(tItem->spType != _TypeFloat)
+  {
+    aReturn # 0.0;
+    return;
+  }
+    
+  aReturn # tItem->spValueFloat;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+//-------------------------------------------------------------------------------------------------
+// getRootNode()
+//-------------------------------------------------------------------------------------------------
+sub getRootNode
+  (
+  aCte : int;
+  aPath : alpha(500);
+  var tRoot : int;
+  var tNodeName : alpha;
+  ) : int;
+local
+  {
+  tNode : int;
+  tRet : int;
+  tPath : alpha;
+  tFind : int;
+  tLen : int;
+  }
+{
+  tLen # StrLen(aPath);
+  tFind # StrFind(aPath,'/',1,_StrFindReverse);
+  if(tFind = 0)
+  {
+    tRoot # aCte;
+    tNodeName # aPath;
+  }
+  else
+  {
+    tNodeName # StrCut(aPath,tFind+1,tLen-tFind);
+    tPath # StrCut(aPath,1,tFind-1);
+    tRoot # aCte->CteRead(_CteNodePath, 0, tPath);
+    if(tRoot = 0)
+      return(-1);
+  }
+
+return(0);
+}
+
+//-------------------------------------------------------------------------------------------------
+// InsertNode()
+//-------------------------------------------------------------------------------------------------
+sub InsertNode
+  (
+  aCte : int;
+  aPath : alpha(128);
+  opt aPosition : int; // _CteFirst ...
+  opt aReference : int;
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+ tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+  tNode # tRoot->CteInsertNode(tNodeName,_JsonNodeObject,NULL,aPosition,aReference);
+
+return(tNode);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// InsertLogic()
+//-------------------------------------------------------------------------------------------------
+sub InsertLogic
+  (
+  aCte : int;
+  aPath : alpha(500);
+  aValue : logic;
+  opt aPosition : int; // _CteFirst ...
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+
+
+  tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+  tNode # tRoot->CteInsertNode(tNodeName, _JsonNodeBoolean, aValue,aPosition);
+
+return(tNode);
+}
+
+//-------------------------------------------------------------------------------------------------
+// InsertAlpha()
+//-------------------------------------------------------------------------------------------------
+sub InsertAlpha
+  (
+  aCte : int;
+  aPath : alpha(500);
+  aValue : alpha;
+  opt aPosition : int; // _CteFirst ...
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+  tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+
+  tNode # tRoot->CteInsertNode(tNodeName, _JsonNodeString, aValue);
+  return(tNode);
+
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// InsertInt()
+//-------------------------------------------------------------------------------------------------
+sub InsertInt
+  (
+  aCte : int;
+  aPath : alpha(4096);
+  aValue : Int;
+  opt aPosition : int; // _CteFirst ...
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+  tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+
+  tNode # tRoot->CteInsertNode(tNodeName, _JsonNodeNumber, aValue);
+  return(tNode);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// InsertFloat()
+//-------------------------------------------------------------------------------------------------
+sub InsertFloat
+  (
+  aCte : int;
+  aPath : alpha(4096);
+  aValue : float;
+  opt aPosition : int; // _CteFirst ...
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+  tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+
+  tNode # tRoot->CteInsertNode(tNodeName, _JsonNodeNumber, aValue);
+  return(tNode);
+}
+
+//-------------------------------------------------------------------------------------------------
+// InsertBigint()
+//-------------------------------------------------------------------------------------------------
+sub InsertBigint
+  (
+  aCte : int;
+  aPath : alpha(4096);
+  aValue : bigint;
+  opt aPosition : int; // _CteFirst ...
+  ) : int;
+local
+  {
+  tRoot : int;
+  tRet : int;
+  tNodeName : alpha;
+  tNode : int;
+  }
+{
+  tRet # getRootNode(aCte,aPath,var tRoot,var tNodeName);
+  if(aPosition = 0)
+  {
+    tRet # aCte->CteRead(_CteNodePath, 0, aPath);
+    if(tRet != 0)
+      return(0);
+  }
+
+  tNode # tRoot->CteInsertNode(tNodeName, _JsonNodeNumber, aValue);
+  return(tNode);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Open()
+//-------------------------------------------------------------------------------------------------
+sub Open
+  (
+  var aCte : int;
+  ) : int;
+{
+aCte # CteOpen(_CteNode);
+aCte->spID # _JsonNodeObject;
+}
+
+//-------------------------------------------------------------------------------------------------
+// JsonToAlpha()
+//-------------------------------------------------------------------------------------------------
+sub JsonToAlpha
+  (
+  aCte : int;
+  ) : alpha;
+local
+  {
+  tRet : int;
+  tMem : int;
+  }
+{
+tMem # MemAllocate(_Mem16K);
+tRet # JsonSave(aCte,'',_JsonSaveDefault,tMem);
+return(Lib_Mem:MemToAlpha(tMem));
+}
+
+//-------------------------------------------------------------------------------------------------
+// JsonToMem()
+//-------------------------------------------------------------------------------------------------
+sub JsonToMem
+  (
+  aCte : int;
+  var aMem : int;
+  opt aFormatetOutput : logic;
+  )
+local
+  {
+  tRet : int;
+  tOption : int;
+  }
+{
+aMem # MemAllocate(_MemAutoSize);
+if(aFormatetOutput)
+  tOption # _JsonSaveDefault;
+else
+  tOption # _JsonSavePure;
+tRet # JsonSave(aCte,'',tOption,aMem,_CharsetUTF8);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// AlphaToMemUtf8()
+//-------------------------------------------------------------------------------------------------
+sub AlphaToMemUtf8
+  (
+  aJson : alpha(4096);
+  var aMem : int;
+  ) : alpha;
+local
+  {
+  tRet : int;
+  }
+{
+aMem # MemAllocate(StrLen(aJson)+100);
+aMem->spCharset # _CharsetUtf8;
+MemWriteStr(aMem,1,aJson,_sys->spCharset);
+}
+
+//-------------------------------------------------------------------------------------------------
+// TextToJson()
+//-------------------------------------------------------------------------------------------------
+sub TextToJson
+(
+  aTextName : alpha;
+  var aCte : int;
+) : int;
+local
+{
+  tRet : int;
+  tMem : handle;
+}
+{
+  tRet # Lib_Text:TextToMem(aTextName, var tMem);
+  if(tRet != 0)
+  {
+    MemFree(tMem);
+    return(-1);
+  }
+  aCte # CteOpen(_CteNode);
+  aCte->spID # _JsonNodeObject;
+  tRet # JsonLoad(aCte,'',0,tMem);
+  if(tRet != 0)
+  {
+    MemFree(tMem);
+    return(-2);
+  }
+  MemFree(tMem);
+  return(0);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// AlphaToJson()
+//-------------------------------------------------------------------------------------------------
+sub AlphaToJson
+  (
+  aAlpha : alpha(4096);
+  var aCte : int;
+  ) : int;
+local
+  {
+  tRet : int;
+  tMem : int;
+  }
+{
+aCte # CteOpen(_CteNode);
+aCte->spID # _JsonNodeObject;
+
+tMem # Lib_Mem:AlphaToMem(aAlpha);
+tRet # JsonLoad(aCte,'',0,tMem);
+MemFree(tMem);
+return(tRet);
+}
+
+//-------------------------------------------------------------------------------------------------
+// MemToJson()
+//-------------------------------------------------------------------------------------------------
+sub MemToJson
+(
+  aMem : int;
+  var aCte : int;
+) : int;
+local
+{
+  tRet : int;
+  tMem : int;
+}
+{
+  aCte # CteOpen(_CteNode);
+  aCte->spID # _JsonNodeObject;
+  tRet # JsonLoad(aCte,'',0,aMem);
+  return(tRet);
+}
+
+//-------------------------------------------------------------------------------------------------
+// LoadPrc()
+//-------------------------------------------------------------------------------------------------
+sub LoadPrc
+  (
+  var aCte : int;
+  aTextName : alpha(200);
+  ) : int;
+local
+  {
+  tRet : int;
+  tMem : handle;
+  tBr : alpha(2);
+  }
+{
+tBr # StrChar(13)+StrChar(10);
+aCte # CteOpen(_CteNode);
+aCte->spID # _JsonNodeObject;
+Lib_Prc:PrcToMem(aTextName, var tMem);
+
+lib_Mem:Replace(tMem,'/*'+tBr,'');
+lib_Mem:Replace(tMem,tBr+'*/main(){}','');
+
+tRet # JsonLoad(aCte,'',0,tMem);
+MemFree(tMem);
+return(tRet);
+}
+
+//-------------------------------------------------------------------------------------------------
+// SaveText()
+//-------------------------------------------------------------------------------------------------
+sub SaveText
+  (
+  aCte : int;
+  aTextName : alpha(200);
+  ):int;
+local
+  {
+  tRet : int;
+  tMem : int;
+  tText : int;
+  }
+{
+  tMem # MemAllocate(_Mem16K);
+  tRet # JsonSave(aCte,'',_JsonSaveDefault,tMem);
+  Lib_Text:MemToText(tMem,aTextName);
+}
+
+//-------------------------------------------------------------------------------------------------
+// SavePrc()
+//-------------------------------------------------------------------------------------------------
+sub SavePrc
+  (
+  aCte : int;
+  aTextName : alpha(200);
+  )
+local
+  {
+  tRet : int;
+  tMem : int;
+  tText : int;
+  }
+{
+tMem # MemAllocate(_Mem16K);
+tRet # JsonSave(aCte,'',_JsonSaveDefault,tMem);
+Lib_Prc:MemToPrc(tMem,aTextName);
+
+}
+
+
+
+//-------------------------------------------------------------------------------------------------
+// Save()
+//-------------------------------------------------------------------------------------------------
+sub SaveFile
+  (
+  aCte : int;
+  aFilePNE : alpha(200);
+  )
+local
+  {
+  tRet : int;
+  tMem : int;
+  tText : int;
+  }
+{
+tRet # JsonSave(aCte,aFilePNE,_JsonSaveDefault);
+}
+
+//-------------------------------------------------------------------------------------------------
+// InsertArray()
+//-------------------------------------------------------------------------------------------------
+sub InsertArray
+  (
+  aCte : int;
+  aPath : alpha(128);
+  ) : int;
+local
+  {
+  tItem : int;
+  tPath : alpha(128);
+  tFind : int;
+  tNode : alpha(64);
+  }
+{
+tFind # StrFind(aPath,'/',1,_StrFindReverse);
+if (tFind = 0)
+  {
+  tNode # aPath;
+  tItem # aCte->CteInsertNode(tNode,_JsonNodeArray,NULL);
+  }
+else
+  {
+  tNode # Strcut(aPath,tFind+1,StrLen(aPath)-tFind);
+  tPath # Strcut(aPath,1,tFind-1);
+  tItem # aCte->CteRead(_CteNodePath, 0, tPath);
+  if(tItem = 0)
+    return(0);
+  tItem # tItem->CteInsertNode(tNode,_JsonNodeObject,NULL);
+  }
+return(tItem);
+}
+
+
+
+//-------------------------------------------------------------------------------------------------
+// WriteInt()
+//-------------------------------------------------------------------------------------------------
+sub WriteInt
+  (
+  aCte : int;
+  aPath : alpha(128);
+  aValue : int;
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0, aPath);
+if(tItem = 0)
+  return(false);
+
+tItem->spValueInt # aValue;
+return(true);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// WriteAlpha()
+//-------------------------------------------------------------------------------------------------
+sub WriteAlpha
+  (
+  aCte : int;
+  aPath : alpha(500);
+  aValue : alpha(500);
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(false);
+
+tItem->spValueAlpha # aValue;
+return(true);
+}
+
+//-------------------------------------------------------------------------------------------------
+// WriteFloat()
+//-------------------------------------------------------------------------------------------------
+sub WriteFloat
+  (
+  aCte : int;
+  aPath : alpha(500);
+  aValue : float;
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(false);
+
+tItem->spValueFloat # aValue;
+return(true);
+}
+
+
+
+
+//-------------------------------------------------------------------------------------------------
+// WriteLogic()
+//-------------------------------------------------------------------------------------------------
+sub WriteLogic
+  (
+  aCte : int;
+  aPath : alpha(500);
+  aValue : logic;
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(false);
+
+tItem->spValueLogic # aValue;
+return(true);
+}
+
+//-------------------------------------------------------------------------------------------------
+// ReadLogic()
+//-------------------------------------------------------------------------------------------------
+sub ReadLogic
+  (
+  aCte : int;
+  aPath : alpha(64);
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(NULL);
+
+return(tItem->spValueLogic);
+}
+
+//-------------------------------------------------------------------------------------------------
+// ReadLogicNull()
+//-------------------------------------------------------------------------------------------------
+sub ReadLogicNull
+  (
+  aCte : int;
+  aPath : alpha(64);
+  var aNull : logic;
+  ) : logic;
+local
+  {
+  tItem : int;
+  }
+{
+  tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+  if(tItem = 0)
+  {
+    aNull # true;
+    return(false);
+  }
+  return(tItem->spValueLogic);
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ReadIntNull()
+//-------------------------------------------------------------------------------------------------
+sub ReadIntNull
+  (
+  aCte : int;
+  aPath : alpha(64);
+  var aNull : logic;
+  ) : int;
+local
+  {
+  tItem : int;
+  }
+{
+if(aPath = '')
+  {
+  tItem # aCte->CteRead(_CteChildList | _CteFirst);
+  return(CnvIA(tItem->spValueAlpha));
+  }
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(HdlInfo(tItem,_HdlType) != 34)
+{
+  aNull # true;
+  return(0);
+}
+if(tItem->spType != 10)
+{
+  aNull # true;
+  return(0);
+}
+return(tItem->spValueInt);
+}
+
+//-------------------------------------------------------------------------------------------------
+// ReadFloat()
+//-------------------------------------------------------------------------------------------------
+sub ReadFloat
+  (
+  aCte : int;
+  aPath : alpha(64);
+  ) : float;
+local
+  {
+  tItem : int;
+  }
+{
+if(aPath = '')
+  {
+  tItem # aCte->CteRead(_CteChildList | _CteFirst);
+  return(CnvFA(tItem->spValueAlpha));
+  }
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(HdlInfo(tItem,_HdlType) != 34)
+  return(0.0);
+if(tItem->spType != 13)
+  return(0.0);
+return(tItem->spValueFloat);
+}
+
+
+
+
+//-------------------------------------------------------------------------------------------------
+// endcodeContent()
+//-------------------------------------------------------------------------------------------------
+sub endcodeContent
+(
+  aContent : alpha(4096);
+): alpha;
+local
+{
+  tCount : int;
+  tLen : int;
+  tChar : int;
+  tContent : alpha(4096)
+}
+{
+  tLen # StrLen(aContent);
+  for tCount # 1
+  loop Inc(tCount)
+  while(tCount <= tLen)
+  {
+    tChar # StrToChar(aContent,tCount);
+    switch(true)
+    {
+      case tChar = 9  : tContent # tContent+'\t'; //Tab to be replaced with \t
+      case tChar = 10 : tContent # tContent+'\n'; //Newline to be replaced with \n
+      case tChar = 13 : tContent # tContent+'\r'; // Carriage return to be replaced with \r
+      case tChar < 32 : cycle;                    // Backspace to be replaced with \b, Form feed to be replaced with \f
+      case tChar = 34 : tContent # tContent+'\"'; // Double quote to be replaced with \"
+      case tChar = 92 : tContent # tContent+'\\'; // Backslash to be replaced with \\
+      default :  tContent # tContent+StrChar(tChar);
+    }
+  
+  }
+  return tContent;
+
+}
+
+
+*/
+

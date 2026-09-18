@@ -1,0 +1,62 @@
+{ŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠ…
+ ƒ* PRC-Name    : ADR-A SMS                         ƒ
+ ƒ* Zweck       :                                   ƒ
+ ƒ* Aufruf      :                                   ƒ
+ ƒ* Erstellt am : 31.01.2000                        ƒ
+ ƒ* Geändert am : 01.02.2001/BV                     ƒ
+ ƒ* Autor       : BV                                ƒ
+ †ŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŒ}
+VAR Kunde # Logic;
+    ausschliessen # Logic;
+    eSms # Alpha
+begin
+if :5,1,15: = '' then
+     begin
+     Call('_Say','','Handy-Nummer fehlt',y);
+     SetFKey(0);
+     Return;
+     end;
+TextOpen(1,7);
+TextClr(1);
+TextInsLine(1,1,:5,1,15:);
+ClipboardWrite(1,0);
+TextClose(1);
+if Not(:SYS-RTF:) then Call('_Say','Handy-Nummer','Nummer in Zwischenablage gespeichert',y);
+SetFKey(0);
+if Not(:SYS-RTF:) then return;
+if :5,1,15: <> '' and len(:5,1,15:) >3 then
+     begin
+     Case Copy(:5,1,15:,1,3) of
+     '076','077','078','079','*076','*077','*078','*079' do
+          begin
+          eSms # Sndx(:5,1,15:,3);
+          eSms # del(eSms,1,1);
+          eSms # '0041' + eSms + '@esms.ch';
+          end
+     end;
+     end;
+RecRead(997,1,n);
+RecRead(5,1,n);
+:ADR-DatIdt: # :5,1,24:;
+RecRead(1,1,n);
+Call('DatIdt',140);
+Call('Adresse Mail');
+:ADR-EMail: # eSms;
+Call('Fnc_DocNew',140,:KOM-DatIdt:,y,'',y);
+if :ADR-KommText: = N then
+     begin
+     RecRead(1,1,y);
+     while Erg = 3 do RecRead(1,1,y);
+     :ADR-KommText: # Y;
+     :ADR-KomText: # 'AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y);
+     RecReplace(1,n);
+     end;
+ChkText('AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y));
+if Erg = 4 then CreaText('AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y),'MASKENTEXT');
+TextOpen(2,10);
+TextLoad(2,'AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y),n);
+If not (ScanText('AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y),'E-Mail vom ' + alpha(Today,n) + ' ' + :SEB-Bezeichnung:,n,n)) then
+TextInsLine(2,1,'SMS vom ' +  alpha(Today,n) + ' ' + :TXT-Bezeichnung:);
+TextSave(2,'AKOM-' + CutStr(Alpha(:ADR-DatIdt:),y),n);
+TextClose(2);
+end

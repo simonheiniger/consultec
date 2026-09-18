@@ -1,0 +1,1103 @@
+@A+
+@C+
+@I:Doc_Define
+@I:Doc_Global
+@I:Doc_CtxDefine
+
+//=================================================================================================
+//  AttCheck
+//=================================================================================================
+sub AttCheck
+  (
+  aPref : handle;
+  aAttList : handle;
+  ) : logic; // Att Exists
+local
+  {
+  tRet : int;
+  tRel : logic;
+  tRoot : handle;
+  tItem : handle;
+  tName : alpha(128);
+  tAttName : alpha(128);
+  tMem : handle;
+  tFind : int;
+  tAttExists : logic;
+  tCount : int;
+  }
+{
+
+tRel # Mdl_Lib:NodeReadLogic(aPref,'Pref/AttKeyWordsCheck');
+if(tRel = false)
+  return(true);
+
+//--- Obj to Mem --------------------------------
+tRet # gCtx->cpiSave(gTempPath+'AttTest.txt', 0,txFormatTexANSI);
+tMem # MemAllocate(_MemAutoSize);
+tRet # Mdl_Lib:FileToMem(tMem,gTempPath+'AttTest.txt',_FsiAcsR | _FsiAnsi);
+FsiDelete(gTempPath+'AttTest.txt');
+Mdl_Lib:MemoryCnv(tMem,_CharsetWCP_1252,_sys->spCharset)
+//--- Test --------------------------------------
+tRoot # Mdl_Lib:NodeRead(aPref,'Pref/AttKeyWords');
+for tItem # tRoot->CteRead(_CteFirst);
+loop tItem # tRoot->CteRead(_CteNext,tItem);
+while (tItem != 0)
+  {
+
+  tName # Mdl_Lib:NodeGetText(aPref,tItem);
+  tFind # tMem->MemFindStr(1,tMem->spLen,tName,_StrCaseIgnore);
+  if(tFind != 0)
+    {
+    if(tName =* '*.*') // Extension
+      {
+      tName # FsiSplitName(tName,_FsiNAmeE);
+      tAttExists # false;
+      tCount # 1
+      for tRel # WinLstCellGet(aAttList,tAttName,3,tCount);
+      loop tRel # WinLstCellGet(aAttList,tAttName,3,tCount);
+      while (tRel = true)
+        {
+        tAttName # FsiSplitName(tAttName,_FsiNAmeE);
+        if(tAttName = tName)
+          {
+          tAttExists # true;
+          break;
+          }
+        Inc(tCount);
+        }
+      if(tAttExists = false)
+        return(false);
+      }
+    else
+      {
+      if(WinLstDatLineInfo(aAttList,_WinLstDatInfoCount) = 0)
+       return(false);
+      }
+    }
+  }
+MemFree(tMem);
+return(true);
+}
+
+//=================================================================================================
+//   SetAcc()
+//=================================================================================================
+sub SetAcc()
+local
+  {
+  qAcc : handle;
+  tFilter : handle;
+  tPopup : handle;
+  tRet : int;
+  tLine : int;
+  tLineAccMain : int;
+  tCaptionAccMain : alpha(250);
+  tAccIdAccMain : int;
+  }
+{
+qAcc # recBufCreate(512);
+tFilter # RecFilterCreate(512,2);
+tFilter->RecFilterAdd(2,_FltAnd,_FltEq,0);
+tFilter->RecFilterAdd(3,_FltAnd,_FltEq,'server');
+//--- Rechteverwaltung --------------------------
+if ((gUserId =^ 'forrer') = false)
+  tFilter->RecFilterAdd(7,_FltAnd,_FltScan,Eml_Lib:AlphaToFilter(gUserId));
+//--- Main Account ------------------------------
+tFilter->RecFilterAdd(8,_FltOr,_FltEq,true);
+//--- Loop --------------------------------------
+tPopup # $dlFromAddress;
+for tRet # RecRead(qAcc,2,_RecFirst,tFilter)
+loop tRet # RecRead(qAcc,2,_RecNext,tFilter)
+while (tRet = 0)
+  {
+  tLine # tPopup->WinLstDatLineAdd(qAcc->EAC.Name, _WinLstDatLineLast);
+  tPopup->WinLstCellSet(qAcc->EAC.EmailName+' <'+qAcc->EAC.Email+'>',2,_WinLstDatLineLast,_WinLstDatModeDefault);
+  //tPopup->WinLstCellSet(qAcc->EAC.Email,3,_WinLstDatLineLast,_WinLstDatModeDefault);
+  tPopup->WinLstCellSet(qAcc->EAC.Id,4,_WinLstDatLineLast,_WinLstDatModeDefault);
+
+  if (qAcc->EAC.Id = gAccParentId)
+    {
+    tPopup->wpCurrentInt # tLine;
+    $edFromAddress->wpCaption # qAcc->EAC.Name;
+    }
+  if (qAcc->EAC.AccMain = true)
+    {
+    tLineAccMain # tLine;
+    tCaptionAccMain # qAcc->EAC.Name;
+    tAccIdAccMain # qAcc->EAC.Id;
+    }
+  }
+if (tPopup->wpCurrentInt = 0)
+  {
+  tPopup->wpCurrentInt # tLineAccMain;
+  $edFromAddress->wpCaption # tCaptionAccMain;
+  gAccId # tAccIdAccMain;
+  gEmlAccId # tAccIdAccMain;
+  gAccParentId # Eml_Lib:GetParent(gAccId);
+  }
+}
+
+//=================================================================================================
+//  Zeile aus Text löschen
+//=================================================================================================
+sub DeleteLine
+  (
+  aBufTextData : handle;
+  aAdressListPNE : alpha(512);
+  aLine : alpha(4095);
+  )
+local
+  {
+  tLineNo : int;
+  }
+{
+//--- letztes ; entfernen -----------------------
+aLine # StrCut(aLine,1,StrLen(aLine)-1);
+tLineNo # aBufTextData->TextSearch(1,1,_TextSearchCI,aLine);
+if (tLineNo != 0)
+  {
+  aBufTextData->TextLineRead(tLineNo,_TextLineDelete);
+  aBufTextData->TextWrite(aAdressListPNE,_TextExtern | _TextANSI);
+  }
+}
+
+//=================================================================================================
+//  Zeile bis zu 4096 Zeichen lesen
+//=================================================================================================
+sub ReadLine
+  (
+  aTextHdl          : handle;           // Deskriptor des Textpuffers
+  opt aOptions      : int;              // Optionen bei TextLineRead
+  opt aLine         : int;              // zu lesende Zeile
+  ): alpha;                                // gelesener Text
+local
+  {
+  tLineCnt        : int;
+  tText           : alpha(4096);
+  }
+{
+if (aLine = 0)
+  tLineCnt # 1;
+else
+  tLineCnt # aLine;
+try
+  {
+  // Überlauf von Alpha abfangen
+  ErrTryCatch(_ErrValueRange, true);
+
+  // in aktueller Zeile ist weicher Zeilenumbruch vorhanden (NoLineFeed)
+  while(TextLineRead(aTextHdl, tLineCnt, 0) != '' AND TextInfo(aTextHdl, _TextNoLineFeed) = 1)
+    {
+    // Zeileinhalt hinzufügen
+    tText # tText + TextLineRead(aTextHdl, tLineCnt, aOptions);
+    // wenn Zeile nicht gelöscht werden soll, die nächste lesen
+    if (aOptions != _TextLineDelete)
+    inc(tLineCnt);
+    // Laufzeitfehler vorher verhindern. Sonst werden Bilder nicht korrekt dargestellt
+    if (StrLen(tText) > 3500)
+    break;
+    }
+  tText # tText + TextLineRead(aTextHdl, tLineCnt, aOptions);
+  }
+return(tText);
+}
+
+//=================================================================================================
+//  Splittet eine Zeichenkette an einem Leerzeichen oder
+//  spätestes nach der festgelegten Anzahl an Zeichen
+//=================================================================================================
+sub SplitStrSpaceLen
+  (
+  aLine             : alpha(4096);      // Zeile
+  var vPart1        : alpha;            // erster Teil
+  var vPart2        : alpha;            // zweiter Teil
+  aLen              : int;              // maximale Länge
+  )
+local
+  {
+  tStr            : alpha(4096);      // Zeichenkette
+  tPos            : int;              // Position
+  tPos2           : int;
+  tPos3           : int;
+  tChar           : alpha(1);
+  }
+{
+if (StrLen(aLine) <= aLen)
+  {
+  vPart1 # aLine;
+  vPart2 # '';
+  }
+else
+  {
+  // Maximale Länge aus Zeile lesen
+  tStr # StrCut(aLine, 1, aLen);
+  // Wort-Trennzeichen suchen
+  tPos  # StrFind(tStr, ' ', 1, _StrFindReverse);
+  tPos  # max(tPos, StrFind(tStr, '>', 1, _StrFindReverse));
+  tPos2 # StrFind(tStr, ';', 1, _StrFindReverse);
+  for   tPos3 # tPos2 - 1;
+  loop  dec(tPos3)
+  while (tPos3 > tPos)
+    {
+    tChar # StrCut(tStr, tPos3, 1);
+    switch (tChar)
+      {
+      case ' ', '>', ';' : {tPos # tPos2; break;}
+      case '&' : break;
+      }
+    }
+  // Keine Position ermittelt => maximale Länge verwenden
+  if (tPos = 0 or tPos = aLen)
+  tPos # aLen;
+  // Zeichenkette bis zur Länge ausschneiden und Rest der Zeichenkette merken
+  vPart1 # StrCut(aLine, 1, tPos);
+  vPart2 # StrDel(aLine, 1, tPos);
+  }
+}
+
+
+// ******************************************************************
+// *  Zeile bis zu 4096 Zeichen schreiben                           *
+// ******************************************************************
+
+sub WriteLine
+(
+  aTextHdl          : handle;           // Deskriptor des Textpuffers
+  aText             : alpha(4096);      // zu schreibender Text
+  opt aLine         : int;              // Zeile (wenn 0, wird der Text hinten angefügt)
+)
+: int;                                  // Resultat: Nr der hinzugefügten Zeile
+
+  local
+  {
+    tTextLine       : alpha(250);
+    tCnt            : int;
+    tLastLineNr     : int;
+  }
+
+{
+  // Text länger als 250 Zeichen
+  while (StrLen(aText) > 250)
+  {
+    tTextLine # StrCut(aText, 1, 250);
+    aText # StrDel(aText, 1, 250);
+    // Text in Textpuffer einfügen
+    if (aLine = 0)
+      TextLineWrite(aTextHdl, TextInfo(aTextHdl, _TextLines) + 1, tTextLine, _TextLineInsert | _TextNoLineFeed);
+    else
+      TextLineWrite(aTextHdl, aLine+tCnt, tTextLine, _TextLineInsert | _TextNoLineFeed);
+
+    inc(tCnt);
+  }
+
+  // Zeilennummer der letzten Zeile ermitteln
+  if (aLine = 0)
+    tLastLineNr # TextInfo(aTextHdl, _TextLines) + 1;
+  else
+    tLastLineNr # aLine+tCnt;
+
+  // Text in Textpuffer einfügen
+  TextLineWrite(aTextHdl, tLastLineNr, aText, _TextLineInsert);
+
+  return (tLastLineNr);
+}
+
+//=================================================================================================
+//   SetAttArray()
+//=================================================================================================
+sub SetAttArray
+  (
+  var aAttPNE : alpha[] ;
+  aTempAttP : alpha(1000);
+  )
+local
+  {
+  tRet : int;
+  tLet : logic;
+  tPNE : alpha(500);
+  tAttCount : int;
+  tExtension : alpha(10);
+  tTempAttPNE : alpha(1000);
+  }
+{
+//--- Anhang Array schreiben ------------------
+for tAttCount # 1;
+loop Inc(tAttCount);
+while(tAttCount < 1000)
+  {
+  if ($dlAtt->WinLstCellGet(tPNE,3,tAttCount))
+    {
+    aAttPNE[tAttCount] # tPNE;
+    tExtension # StrCnv(FsiSplitName(tPNE, _FsiNameE), _StrLower);
+    //---FSX ----------------------------------
+    if(tExtension = 'fsx')
+      {
+      tTempAttPNE # aTempAttP;
+      tLet # Lib_Fsx:XFileToFile(tPNE,var tTempAttPNE,false);
+      if(tLet)
+        aAttPNE[tAttCount] # tTempAttPNE;
+      }
+    }
+  else
+    {
+    aAttPNE[tAttCount] # '';
+    break;
+    }
+  }
+}
+
+//=================================================================================================
+//   SetImgageArr()
+//=================================================================================================
+sub SetImgageArr
+  (
+  aHtmlPath : alpha(4096);
+  var aImgNE : alpha[];
+  var aImgCid : alpha[];
+  ) : logic;
+local
+  {
+  tDir : handle;
+  tFileName : alpha(16);
+  tCount : int;
+  tBigint : bigint;
+  tCid : alpha(32);
+  tRnd : alpha(32);
+  }
+{
+//--- Bilder ----------------------------------
+tDir # FsiDirOpen(aHtmlPath+'Send_Images\', 0);
+for   tFileName # tDir->FsiDirRead();
+loop  tFileName # tDir->FsiDirRead();
+while (tFileName != '')
+  {
+  if (tFileName = '.' or tFileName = '..')
+    cycle;
+  Inc(tCount);
+  tBigint->vmSystemTime()
+  tRnd # CnvAB(tBigint,_FmtNumNoGroup);
+  tCid # 'image'+CnvAI(tCount,_FmtNumNoGroup)+'@'+StrCut(tRnd,StrLen(tRnd)-8,6)+'.'+StrCut(tRnd,StrLen(tRnd)-2,3);
+  aImgNE[tCount] # tFileName;
+  aImgCid[tCount] # tCid;
+  }
+//--- End ----------
+tDir->FsiDirClose();
+}
+
+
+//=================================================================================================
+//   FormatContentId
+//=================================================================================================
+sub FormatContentId
+  (
+  aHtmlPath : alpha(4096);
+  var aImgNE : alpha[];
+  var aImgCid : alpha[];
+  ) : logic;
+local
+  {
+  tMem : handle;
+  tMemTemp : handle;
+  tFsi : handle;
+  tCount : int;
+  tStart : int;
+  tFind : int;
+  tSearchStr : alpha(64);
+  tInsertStr : alpha(64);
+  tDir : handle;
+  tFileName : alpha(250);
+  tCid : alpha(32);
+  tBigint : bigint;
+  }
+{
+tMem # MemAllocate(_MemAutoSize);
+tFsi # FsiOpen(aHtmlPath+'Send.html',_FsiAcsRW);
+tFsi->FsiReadMem(tMem,1,tFsi->FsiSize());
+tFsi->FsiClose();
+//--- Bilder --------------------
+for tCount # 1;
+loop inc(tCount);
+while(aImgNE[tCount] != '')
+  {
+  //--- Image Code ersetzten --------------------
+  tSearchStr # '<img src="'+aImgNE[tCount];
+  tInsertStr # '<img src="cid:'+aImgCid[tCount];
+  tStart # 1;
+  do
+    {
+    tFind # tMem->MemFindStr(tStart,tMem->spLen-tStart,tSearchStr);
+    if (tFind = 0) break;
+    tMem->MemCopy(tFind+StrLen(tSearchStr),tMem->spLen-tFind+1-StrLen(tSearchStr),tFind+StrLen(tInsertStr),tMem);
+    tMem->MemWriteStr(tFind,tInsertStr);
+    tStart # tFind;
+    }
+  while(tFind != 0)
+  }
+//--- File speichern -----------------------------------------
+tFsi # FsiOpen(aHtmlPath+'Send.html',_FsiAcsRW | _FsiTruncate);
+tFsi->FsiWriteMem(tMem,1,tMem->spLen);
+tFsi->FsiClose();
+//--- End -------------------------------------
+tMem->MemFree();
+tMemTemp->MemFree();
+tDir->FsiDirClose();
+}
+
+//=================================================================================================
+//   HTML-Format nach spätestens 78 Zeichen umbrechen
+//=================================================================================================
+sub CutHTML
+  (
+  aTextHdlSrc : handle;
+  aTextHdlTar : handle;
+  )
+
+local
+  {
+  tLine : alpha(4096);        // Alte Zeile
+  tNewLine : alpha(1000); // Neue Zeile
+  tMaxLineLen : int;
+  }
+{
+tMaxLineLen # 498; //78 498 998
+// Alle Zeilen einlesen
+for   tLine # aTextHdlSrc->ReadLine(_TextLineDelete);
+loop  tLine # aTextHdlSrc->ReadLine(_TextLineDelete);
+while (aTextHdlSrc->TextInfo(_TextLines) > 0)
+  {
+  // Zeile in Teile mit der maximalen Länge zerlegen
+  for   SplitStrSpaceLen(tLine, var tNewLine, var tLine, tMaxLineLen);
+  loop  SplitStrSpaceLen(tLine, var tNewLine, var tLine, tMaxLineLen);
+  while (tNewLine != '' or tLine != '')
+    {
+    aTextHdlTar->WriteLine(tNewLine);
+    }
+  }
+}
+
+//=================================================================================================
+// FormatHTML()
+//=================================================================================================
+sub FormatHTML
+  (
+  aFilePathNameHtml : alpha(4096);
+  aRemoveBasPath : logic;
+  ) : logic;
+local
+  {
+  tTxtHdl         : handle;
+  tTxtHdlTar      : handle;
+  tLineNo         : int;
+  tPos            : int;
+  tPosEnd         : int;
+  tLine           : alpha(250);
+  }
+
+{
+// HTML-Datei öffnen
+tTxtHdl     # TextOpen(512);
+tTxtHdlTar  # TextOpen(512);
+tTxtHdl->TextRead(aFilePathNameHtml, _TextExtern | _TextANSI);
+//<?xml version="1.0" encoding="UTF-8" ?>
+//<html xmlns="http://www.w3.org/1999/xhtml">
+//--- xml Tag entfernen -------------------------------------------
+tTxtHdl->TextLineRead(1, _TextLineDelete);
+//--- html Tag entfernen ------------------------------------------
+tTxtHdl->TextLineRead(1, _TextLineDelete);
+//--- html Tag einfügen -------------------------------------------
+tTxtHdl->TextLineWrite(1,'<html>',_TextLineInsert);
+//--- Basis Pfad ersetzen -----------------------------------------
+if(aRemoveBasPath)
+  tLineNo # tTxtHdl->TextSearch(1, 1, _TextSearchCI, '<base href="');
+if (tLineNo > 0)
+{
+// Position des Basispfades ermitteln
+tPos    # tTxtHdl->TextInfo(_TextSearchClm);
+tLine   # tTxtHdl->TextLineRead(tLineNo, _TextLineDelete);
+tPosEnd # StrFind(tLine, '>', tPos + 1);
+if (tPosEnd = 0)
+  {
+  // Ende nicht in der gleichen Zeile => weitere Zeilen lesen
+  tLine # StrCut(tLine, 1, tPos - 1);
+  tTxtHdl->TextLineWrite(tLineNo, tLine, _TextLineInsert);
+  for
+    {
+    inc(tLineNo);
+    tLine   # tTxtHdl->TextLineRead(tLineNo, _TextLineDelete);
+    }
+  loop  tLine   # tTxtHdl->TextLineRead(tLineNo, _TextLineDelete);
+  while (StrFind(tLine, '>', 1) = 0)
+    ;
+
+  // Letzte Zeile zurecht schneiden
+  tPos  # StrFind(tLine, '>', 1);
+  tLine # StrDel(tLine, 1, tPos);
+  tTxtHdl->TextLineWrite(tLineNo, tLine, _TextLineInsert);
+  }
+else
+  {
+  // Ende in der gleichen Zeile => Basispfad ausschneiden
+  tLine # StrCut(tLine, 1, tPos - 1) + StrDel(tLine, 1, tPosEnd);
+  tTxtHdl->TextLineWrite(tLineNo, tLine, _TextLineInsert);
+  }
+}
+
+//--- HTML-Text auf maximal 78 Zeichen pro Zeile kürzen ------------------------------
+tTxtHdl->CutHTML(tTxtHdlTar);
+tTxtHdlTar->TextLineWrite(tTxtHdlTar->TextInfo(_TextLines)+1,'</html>',_TextLineInsert);
+tTxtHdlTar->TextWrite(aFilePathNameHtml, _TextExtern | _TextANSI);
+tTxtHdl->TextClose();
+tTxtHdlTar->TextClose();
+return(true);
+}
+
+//=================================================================================================
+//   SetImageSaveMode()
+//=================================================================================================
+sub SetImageSaveMode
+  (
+  aCtxDocEdit           : handle;
+  aMode                 : int;
+  )
+local
+  {
+  tObjectID           : int;
+  }
+{
+do
+  {
+  tObjectID # aCtxDocEdit->cpiObjectNext(tObjectID, 0x04);
+  if (tObjectID != 0)
+    {
+    aCtxDocEdit->cpiObjectCurrent # tObjectID;
+    aCtxDocEdit->cpiImageSaveMode # aMode;
+    cycle;
+    }
+  else
+    break;
+  }
+while (true);
+}
+
+
+//=================================================================================================
+//   Save Pictures
+//=================================================================================================
+sub SaveHtml
+  (
+  aDocEdit : handle;
+  tFilePath : alpha(250);
+  ) : int;
+local
+  {
+  tRet : int;
+  }
+{
+//--- Eigenschaften -----------------------------
+aDocEdit->cpiLoadSaveAttribute(txLinkColor) # _WinColBlue;
+aDocEdit->cplLoadSaveAttribute(txUnderlineLinks) # true;
+aDocEdit->cplLoadSaveAttribute(txEnableLinks) # true;
+aDocEdit->cplLoadSaveAttribute(txEnableHighlights) # true;
+aDocEdit->cpiLoadSaveAttribute(txImageSaveMode) # 1; // 0=Auto   1=Data   2=Reference
+SetImageSaveMode(aDocEdit,1); // Data
+
+//--- Speichern und Laden (wegen neu eingefügten Bildern) ---
+tRet # aDocEdit->cpiSave(tFilePath + 'Document.tx', 0, txFormatTexUniCtrl);
+if (tRet > 0)
+  tRet # aDocEdit->cpiLoad(tFilePath + 'Document.tx', 0,txFormatTexUniCtrl);
+
+//--- HTML File speichern -----------------------
+aDocEdit->cpaLoadSaveAttribute(txBasePath) # tFilePath + 'Send_Images\';
+aDocEdit->cpiLoadSaveAttribute(txImageSaveMode) # 2; // Reference
+SetImageSaveMode(aDocEdit,2); // Reference
+tRet # aDocEdit->cpiSave(tFilePath + 'Send.html', 0, txFormatHTML);
+aDocEdit->cpiLoadSaveAttribute(txImageSaveMode) # 1; // Data
+SetImageSaveMode(aDocEdit,1); // Data
+return(tRet);
+}
+
+// ================================================================================================
+//   DeletDir
+// ================================================================================================
+sub DeletDir
+  (
+  aDeletePath : alpha(250);
+  )
+local
+  {
+  tDirHdl : handle;
+  tFileName : alpha(250);
+  tErr : int;
+  }
+{
+tDirHdl # FsiDirOpen(aDeletePath, 0);
+for   tFileName # tDirHdl->FsiDirRead();
+loop  tFileName # tDirHdl->FsiDirRead();
+while (tFileName != '')
+  {
+  if (tFileName = '.' or tFileName = '..')
+    cycle;
+  tErr # FsiDelete(aDeletePath+tFileName);
+  }
+tErr # FsiPathDelete(aDeletePath);
+tDirHdl->FsiDirClose();
+}
+
+//=================================================================================================
+//   Test E-Mail
+//=================================================================================================
+sub SendTestMail(): int;
+local
+  {
+  tRet : int;
+  tError : int;
+  tLogic : logic;
+  tFrame : handle;
+  tAttPNE : alpha(500)[256];
+  aImgNE : alpha(500)[256];
+  aImgCid : alpha(32)[256];
+  tTempP : alpha(1000);
+  tTempAttP : alpha(1000);
+  }
+{
+//--- Designe -----------------------------------
+$mailClose->wpCaption # 'OK';
+$mailClose->wpDisabled # true;
+$edTestToAddress->wpDisabled # true;
+$edTestSubject->wpDisabled # true;
+$btSendTestMail->wpVisible # false;
+
+//--- CreateTempFolder --------------------------
+tTempP # Mdl_Lib:CreateTempFolder('SendMail');
+tTempAttP # tTempP+'Att\';
+FsiPathCreate(tTempAttP)
+
+do
+  {
+  //--- HTML File speichern ---------------------
+  tRet # SaveHtml(gCtx,tTempP);
+    if (tRet <= 0) {tError # -2; break;}
+  //--- Plain Text File speichern ---------------
+  tRet # gCtx->cpiSave(tTempP + 'Mail.txt', 0, txFormatWinAnsi);
+    if (tRet <= 0) {tError # -3; break;}
+  //--- Bilder Array schreiben ------------------
+  SetImgageArr(tTempP,var aImgNE,var aImgCid);
+  //--- Bildername mit cid: ersetzten -----------
+  FormatContentId(tTempP,var aImgNE,var aImgCid);
+  //--- HTML formatieren ------------------------
+  tLogic # FormatHTML(tTempP+'Send.html',true);
+    if (tLogic = false) {tError # -4; break;}
+  //--- Anhang Array schreiben ------------------
+  SetAttArray(var tAttPNE,tTempAttP);
+
+
+  //--- Send E-Mail -----------------------------
+  tRet # Doc_Lib:EmailSend
+    (
+    'SwissMail',                    // aAccType : alpha(8);
+    gAccParentId,                   // aAccId : int;
+    $edTestToAddress->wpCaption,    // aToEmail : alpha(1000);
+    $edTestSubject->wpCaption,      // aSubject : alpha(1000);
+    Mdl_Lib:GetCh($chNotify),       // aNotify : logic;
+    tTempP + 'Mail.txt',            // aPlainTextPNE : alpha(4096);
+    tTempP+'Send.html',             // aHtmlPNE : alpha(4096);
+    0,                              // aPlainTextHdl : int;
+    0,                              // aHTMLHdl : int;
+    var tAttPNE,                    //opt var aAttPNE : alpha[];
+    var aImgNE,                     //opt var aImgNE : alpha[];
+    var aImgCid                     //opt var aImgCid : alpha[];
+    );
+
+
+
+
+    if (tRet = 0)
+      {
+      Doc_Main:WriteLog('email',"ADR-DatIdt");
+      }
+    else
+      {
+      tError # tRet;
+      break;
+      }
+  }
+while(false);
+//--- DeleteTempFolder -------------------------
+Mdl_Lib:DeleteTempFolder(tTempP);
+//--- Designe ----------------------------------
+$mailClose->wpDisabled # false;
+$mailClose->WinFocusSet();
+//--- Fehlermeldungen --------------------------
+if (tError !=0)
+  {
+  tFrame # WinOpen('Doc_Error',_WinOpenDialog);
+  $ErrorText->wpCaption # Eml_Lib:ServerError('Doc',tError,true);
+  $ErrorNr->wpCaption # 'Fehler: '+CnvAI(tError);
+  WinDialogRun(tFrame,_WinDialogCenter,gFrmMain);
+  WinClose(tFrame);
+  $lbTestStatusText->wpCaption # 'E-Mail nicht gesendet!';
+  }
+else
+  {
+  $lbTestStatusText->wpCaption # 'E-Mail erfolgreich gesendet';
+  }
+return(tError);
+}
+
+//=================================================================================================
+//   SendSingle()
+//=================================================================================================
+sub SendSingle(): int;
+local
+  {
+  tLet : logic;
+  tRet : int;
+  tAttExists : logic;
+  tTempP : alpha(1000);
+  tTempAttP : alpha(1000);
+  tError : int;
+  tFrame : handle;
+  tPNE : alpha(500);
+  tAttPNE : alpha(500)[256];
+  aImgNE : alpha(500)[256];
+  aImgCid : alpha(32)[256];
+  }
+{
+//--- Check Subject -----------------------------
+if ($edSubject->wpCaption = '')
+  {
+  tFrame # WinOpen('Eml_SubjectReminder',_WinOpenDialog)
+  tRet # WinDialogRun(tFrame,_WinDialogCenter,$Doc_Main);
+  WinClose(tFrame);
+  if(tRet <= 0)
+    return(0);
+  }
+//--- Check Attatchment -------------------------
+tAttExists # AttCheck(gPref,$dlAtt);
+if(!tAttExists)
+  {
+  tFrame # WinOpen('Eml_AttReminder',_WinOpenDialog)
+  tRet # WinDialogRun(tFrame,_WinDialogCenter,$Doc_Main);
+  WinClose(tFrame);
+  if(tRet <= 0)
+    return(0);
+  }
+do
+  {
+  //--- CreateTempFolder --------------------------
+  tTempP # Mdl_Lib:CreateTempFolder('SendMail');
+  tTempAttP # tTempP+'Att\';
+  FsiPathCreate(tTempAttP);
+
+  //--- Anhang Array schreiben ------------------
+  SetAttArray(var tAttPNE,tTempAttP);
+
+  //--- HTML File speichern ---------------------
+  tRet # SaveHtml(gCtx,tTempP);
+    if (tRet <= 0)
+      {
+      tError # -2;
+      break;
+      }
+  //--- Plain Text File speichern ---------------
+  tRet # gCtx->cpiSave(tTempP + 'Mail.txt', 0, txFormatWinAnsi);
+    if (tRet < 0)
+      {
+      tError # -3;
+      break;
+      }
+  //--- Bilder Array schreiben ------------------
+  SetImgageArr(tTempP,var aImgNE,var aImgCid);
+  //--- Bildername mit cid: ersetzten -----------
+  FormatContentId(tTempP,var aImgNE,var aImgCid);
+  //--- HTML formatieren ------------------------
+  tLet # FormatHTML(tTempP+'Send.html',true);
+  if (tLet = false)
+    {
+    tError # -4;
+    break;
+    }
+  //--- Send E-Mail -----------------------------
+  tRet # Doc_Lib:EmailSend
+    (
+    'SwissMail',                    // aAccType : alpha(8);
+    gAccParentId,                   // aAccId : int;
+    $edToAddress->wpCaption,        // aToEmail : alpha(1000);
+    $edSubject->wpCaption,          // aSubject : alpha(1000);
+    Mdl_Lib:GetCh($chNotify),       // aNotify : logic;
+    tTempP + 'Mail.txt',            // aPlainTextPNE : alpha(4096);
+    tTempP+'Send.html',             // aHtmlPNE : alpha(4096);
+    0,                              // aPlainTextHdl : int;
+    0,                              // aHTMLHdl : int;
+    var tAttPNE,                    //opt var aAttPNE : alpha[];
+    var aImgNE,                     //opt var aImgNE : alpha[];
+    var aImgCid                     //opt var aImgCid : alpha[];
+    );
+
+  if (tRet = 0)
+    {
+    Doc_Main:WriteLog('email',"ADR-DatIdt");
+    Doc_Lib:EmailSave(gCtx,1,$edToAddress->wpCaption,$edSubject->wpCaption,Eml_Lib:GetFolder(gAccId,'out'),Mdl_Lib:GetCH($chNotify));
+    Eml_Redraw:Set('Doc_Send:SendSingle','Ext','AccFolder','LstKeep',Eml_Lib:GetFolder(gEmlAccId,'out'));
+    }
+  else
+    {
+    tError # tRet;
+    break;
+    }
+
+  }
+while(false);
+//--- DeleteTempFolder --------------------------
+Mdl_Lib:DeleteTempFolder(tTempP);
+//--- Fehlermeldungen ---------------------------
+if (tError !=0)
+  {
+  tFrame # WinOpen('Doc_Error',_WinOpenDialog);
+  $ErrorText->wpCaption # Eml_Lib:ServerError('Doc',tError,true);
+  $ErrorNr->wpCaption # 'Fehler: '+CnvAI(tError);
+  WinDialogRun(tFrame,_WinDialogCenter,gFrmMain);
+  WinClose(tFrame);
+  }
+else
+  gFrmMain->WinClose();
+
+return(tError);
+}
+
+// ================================================================================================
+//   SendMulti()
+// ================================================================================================
+sub SendMulti() : int;
+local
+  {
+  tRet : int;
+  tTempP : alpha(1000);
+  tTempAttP : alpha(1000);
+  tError : int;
+  tCount : int;
+  tLogic : logic;
+  ErrorCount : int;
+  tBufTextData : handle;
+  tLine : alpha(4096);
+  aAdressListPNE : alpha(512);
+  tAttPNE : alpha(500)[256];
+  aImgNE : alpha(500)[256];
+  aImgCid : alpha(32)[256];
+  }
+{
+if(gMailDataListLen = 1)
+  tRet # WinDialogBox(gFrmMain,'',CnvAI(gMailDataListLen)+' E-Mail zum senden bereit! '+StrChar(13)+StrChar(10)+'E-Mail senden?', _WinIcoWarning,_WinDialogYesNo,2);
+else
+  tRet # WinDialogBox(gFrmMain,'',CnvAI(gMailDataListLen)+' E-Mails zum senden bereit! '+StrChar(13)+StrChar(10)+'E-Mails senden?', _WinIcoWarning,_WinDialogYesNo,2);
+if (tRet = _WinIDYes)
+  {
+  gFrameMailMulti->WinUpdate(_WinUpdActivate);
+  }
+else
+  {
+  return(0);
+  }
+
+gFrameMailMulti->wpDisabled # true;
+//--- Designe -----------------------------------
+$mmSendMulti->wpDisabled # true;
+$mmButExit->wpDisabled # true;
+//--- Error Text anlegen ------------------------
+gMailErrorCount # 0;
+gErrorText # TextOpen(512);
+
+//--- Text Datenliste anlegen -------------------
+tBufTextData # TextOpen(512);
+switch (gPrintDataListType)
+  {
+  case 'adr' : aAdressListPNE # "SYS-Temp"+'\Adressen.txt';
+  case 'faz' : aAdressListPNE # "SYS-Temp"+'\Fahrzadr.txt';
+  }
+tBufTextData->TextRead(aAdressListPNE,_TextExtern | _TextANSI);
+
+//--- CreateTempFolder --------------------------
+tTempP # Mdl_Lib:CreateTempFolder('SendMail');
+tTempAttP # tTempP+'Att\';
+FsiPathCreate(tTempAttP);
+
+//--- Anhang Array schreiben ------------------
+SetAttArray(var tAttPNE,tTempAttP);
+
+do
+  {
+  //=== Loop ====================================
+  for tCount # 1;
+  loop
+    {
+    //--- Error ---------------------------------
+    if (tError != 0)
+      {
+      Inc(gMailErrorCount);
+      gErrorText->TextLineWrite(gErrorText->TextInfo(_TextLines)+1,"ADR-Email"+' | '+"ADR-Vorname"+' '+"ADR-Name"+' | Fehler: '+CnvAI(tError)+' '+Eml_Lib:ServerError('MultiMail',tRet,true),_TextLineInsert );
+      tError # 0;
+      }
+    Inc(tCount);
+    }
+  while (tCount <= gMailDataListLen)
+    {
+    //--- Set Vars ------------------------------
+    gMailDataList->wpCurrentInt # tCount;
+    tLogic # gMailDataList->WinLstCellGet(tLine,2,_WinLstDatLineCurrent);
+    tLogic # Doc_MailMulti:SetDbBuf();
+    //--- Empty Email Adress --------------------
+    if("ADR-Email" = '')
+      cycle;
+
+    //--- Temp File lesen und ersetzen ----------
+    if (tLogic = true)
+      {
+      gCtx->WinDocLoadBin(gBinFileMail,_WinDocLoadRtf | _WinDocLoadMix, '');
+      //--- Anzeige -----------------------------
+      $mmCount->wpCaption # 'Sende   '+CnvAI(tCount)+' von '+CnvAI(gMailDataListLen);
+      //--- HTML File speichern -----------------
+      tRet # SaveHtml(gCtx,tTempP);
+      if (tRet <= 0)
+        {
+        tError # -2;
+        cycle;
+        }
+      //--- Bilder Array schreiben --------------
+      SetImgageArr(tTempP,var aImgNE,var aImgCid);
+      //--- Bildername mit cid: ersetzten -------
+      FormatContentId(tTempP,var aImgNE,var aImgCid);
+      //--- HTML formatieren --------------------
+      tLogic # FormatHTML(tTempP+'Send.html',true);
+      if (tLogic = false)
+        {
+        tError # -4;
+        cycle;
+        }
+
+      //--- Send E-Mail -----------------------------
+      tRet # Doc_Lib:EmailSend
+        (
+        'SwissMail',                    // aAccType : alpha(8);
+        gAccParentId,                   // aAccId : int;
+        "ADR-Email",                    // aToEmail : alpha(1000);
+        $edSubject->wpCaption,          // aSubject : alpha(1000);
+        Mdl_Lib:GetCh($chNotify),       // aNotify : logic;
+        tTempP + 'Mail.txt',            // aPlainTextPNE : alpha(4096);
+        tTempP+'Send.html',             // aHtmlPNE : alpha(4096);
+        0,                              // aPlainTextHdl : int;
+        0,                              // aHTMLHdl : int;
+        var tAttPNE,                    //opt var aAttPNE : alpha[];
+        var aImgNE,                     //opt var aImgNE : alpha[];
+        var aImgCid                     //opt var aImgCid : alpha[];
+        );
+
+
+      if (tRet = 0)
+        {
+        Doc_Main:WriteLog('emailmulti',"ADR-DatIdt");
+        DeleteLine(tBufTextData,aAdressListPNE,tLine);
+        }
+      else
+        {
+        tError # tRet;
+        cycle;
+        }
+      }
+    else
+      break;
+    }
+  }
+while(false);
+
+//--- DeleteTempFolder --------------------------
+Mdl_Lib:DeleteTempFolder(tTempP);
+
+//--- Designe -----------------------------------
+gFrameMailMulti->wpDisabled # false;
+$mmSendMulti->wpVisible # false;
+$mmButExit->wpDisabled # false;
+$mmButExit->wpCaption # 'OK';
+$mmButExit->WinFocusSet();
+
+//--- Error Anzeige -----------------------------
+gFrameMailMulti->spId # 1;
+gFrameMailMulti->WinClose();
+
+return(tError);
+}
+
+//=================================================================================================
+// PreviewContent()
+//=================================================================================================
+sub PreviewContent()
+local
+  {
+  tMem : handle;
+  }
+{
+//--- Content -----------------------------------
+Doc_Send:SaveHtml(gCtx,gTempPath);
+//--- HTML formatieren --------------------------
+FormatHTML(gTempPath+'Send.html',false);
+//--- Make Link open in external Browser --------
+Lib_File:FileToMem(gTempPath+'Send.html',var tMem);
+Eml_Mime:eSetLinks(tMem,false);
+Lib_File:MemToFile(tMem,gTempPath+'Send.html');
+
+}
+
+
+//=================================================================================================
+//   TestMail()
+//=================================================================================================
+sub TestMail
+  (
+  tSubject : alpha(512);
+  ): int;
+local
+  {
+  qAcc : handle;
+  tRet : int;
+  tMailFrame : handle;
+  }
+{
+//--- Account -----------------------------------
+qAcc # RecBufCreate(512);
+qAcc->EAC.Id # gAccParentId;
+tRet # RecRead(qAcc,1,0)
+if (tRet != 0)
+  {
+  return(-5);
+  }
+//--- E-Mail Fenster ----------------------------
+tMailFrame # WinOpen('Doc_Mail', _WinOpenDialog);
+tMailFrame->WinSearchPath();
+//--- UI ----------------------------------------
+$edFromAddress->wpCaption # qAcc->EAC.EmailName+'  <'+qAcc->EAC.Email+'>';
+$edTestSubject->wpCaption # tSubject;
+$edTestToAddress->wpCaption # "SYS-Mailadresse";
+tMailFrame->WinDialogRun(_WinDialogCenter, gFrmMain);
+tMailFrame->WinClose();
+return(0);
+}
+
+//=================================================================================================
+// EvtClicked
+//=================================================================================================
+sub EvtClicked
+  (
+  aEvt                 : event;    // Ereignis
+  ): logic;
+{
+switch(aEvt:obj->wpName)
+  {
+  case 'mailClose' : $Doc_Mail->WinClose();
+  case 'btSendTestMail' : SendTestMail();
+  case 'mailSendSingle' : SendSingle();
+  case 'OpenMailMulti' : Doc_MailMulti(false);
+  }
+return(true);
+}
+
+
+

@@ -1,0 +1,135 @@
+Maske "Sms_Pref" — SMS-Einstellungen der Garage
+===============================================
+
+Dialog im CONZEPT 16-Designer. Sms_Cfg:Dialog() öffnet ihn mit
+WinOpen('Sms_Pref',_WinOpenDialog) und speichert nur, wenn WinDialogRun() 1 liefert.
+
+Vorbild im System: Dialog "Mdl_Delete" (Mdl_Lib:DialogDelete).
+
+
+Objekte
+-------
+Die Namen der Eingabefelder und Checkboxen müssen exakt stimmen - der Code
+spricht sie mit $Name an. Die Namen von Buttons und Labels sind frei, sollen
+aber eindeutig sein (lbUserKey, lbPassword, lbOriginator, lbDefaultCc, lbInfo).
+
+  Typ        Name               Caption / Text
+  ---------  -----------------  -------------------------------------------------
+  CheckBox   cbSmsActive        SMS-Versand aktiv
+  Label      (frei)             ASPSMS Userkey
+  Edit       edSmsUserKey
+  Label      (frei)             ASPSMS Passwort
+  Edit       edSmsPassword      -> State: Password ✓
+  Label      (frei)             Absender
+  Edit       edSmsOriginator
+  Label      (frei)             Ländervorwahl
+  Edit       edSmsDefaultCc     -> schmal, 41
+  CheckBox   cbSmsTestMode      Testmodus (es wird nichts versendet)
+  Label      (frei)             Konto eröffnen und Guthaben kaufen: www.aspsms.com
+  Button     btSmsOk            &OK
+  Button     btSmsCancel        &Abbrechen
+
+
+Button-Einstellungen (belegt an Mdl_Delete, Button "Löschen")
+-------------------------------------------------------------
+
+  Eigenschaft      Gruppe    OK-Button        Abbrechen-Button
+  ---------------  --------  ---------------  ----------------
+  TypeButton       Special   _WinBtnClose     _WinBtnClose
+  Id               Special   1                2
+  Default          Key       ✓                –
+  ReturnKeyClick   Key       ✓                –
+
+WinDialogRun() gibt die Id des Buttons zurück, der den Dialog schliesst.
+Nur Id 1 speichert.
+
+
+Anordnung
+---------
+
+  +-----------------------------------------------------+
+  | SMS-Einstellungen                                   |
+  +-----------------------------------------------------+
+  |  [x] SMS-Versand aktiv                              |
+  |                                                     |
+  |  ASPSMS Userkey   [______________________________]  |
+  |  ASPSMS Passwort  [******************************]  |
+  |  Absender         [SWISSGARAGE]                     |
+  |  Ländervorwahl    [41 ]                             |
+  |                                                     |
+  |  [ ] Testmodus (es wird nichts versendet)           |
+  |                                                     |
+  |  Konto eröffnen und Guthaben kaufen:                |
+  |  www.aspsms.com                                     |
+  |                                                     |
+  |                          [   OK   ]  [ Abbrechen ]  |
+  +-----------------------------------------------------+
+
+Tab-Reihenfolge (Gruppe Focus, TabPos) von oben nach unten:
+cbSmsActive 1, edSmsUserKey 2, edSmsPassword 3, edSmsOriginator 4,
+edSmsDefaultCc 5, cbSmsTestMode 6, OK 7, Abbrechen 8.
+
+
+Bauanleitung im Designer
+------------------------
+
+Nur in einer Test-/Entwicklungsdatenbank bauen, nicht in einer Kundendatenbank.
+
+ 1. Symbolleiste: Pfeil neben dem ersten Symbol (Neu) -> Dialog / Frame
+ 2. Speichern unter dem Namen  Sms_Pref
+ 3. Frame anklicken, Eigenschaften (F6), Gruppe Base: Caption = SMS-Einstellungen
+ 4. Palette öffnen (F5). Für jedes Objekt aus der Tabelle oben:
+      - Objekt in der Palette wählen und in den Dialog ziehen
+      - Eigenschaften (F6), Gruppe Base: Name und Caption setzen
+ 5. Passwortfeld: edSmsPassword anklicken, Eigenschaften (F6), Gruppe State:
+    Password = ✓, PasswordChar = * (Standard ist #, beides funktioniert)
+ 6. Beide Buttons nach der Tabelle "Button-Einstellungen" einstellen
+    (Suchfeld: "TypeButton", "Id", "Default", "ReturnKeyClick")
+ 7. Tab-Reihenfolge prüfen (Suchfeld: "TabPos")
+ 8. Speichern
+ 9. Kontrolle in der Objektliste (F7): cbSmsActive, edSmsUserKey, edSmsPassword,
+    edSmsOriginator, edSmsDefaultCc, cbSmsTestMode müssen genau so heissen
+
+
+Erweiterung: Vorlagen
+---------------------
+
+Schritt für Schritt im Designer:
+
+ 1. Maske Sms_Pref öffnen (Datei → Öffnen → Typ "Dialoge" → Sms_Pref),
+    "Nur lesend" NICHT anhaken.
+ 2. Frame anklicken (freie Stelle), F6 → Placement → AreaHeight = 500
+ 3. Die beiden Buttons nach unten schieben (jeweils anklicken, F6 → Placement):
+       btSmsOk       AreaLeft 230   AreaTop 415   AreaWidth 100   AreaHeight 25
+       btSmsCancel   AreaLeft 340   AreaTop 415   AreaWidth 100   AreaHeight 25
+ 4. Neues Label einfügen (Palette F5 → Reiter Ausgabe → erstes Symbol "Label"),
+    dann F6 → Base:
+       Name     lbTemplates
+       Caption  Vorlagen (getrennt durch eine Zeile mit ---):
+    Placement: AreaLeft 20   AreaTop 240   AreaWidth 400   AreaHeight 20
+    (Labels immer Hoehe 20 - eine zu grosse Hoehe deckt darunterliegende Felder ab)
+ 5. Neues TextEdit einfügen (Palette → Reiter Eingabe → Symbol "TextEdit",
+    das erste der drei Blatt-Symbole rechts), dann F6 → Base:
+       Name     teSmsTemplates
+       Caption  (leer lassen)
+    Placement: AreaLeft 20   AreaTop 265   AreaWidth 420   AreaHeight 140
+ 6. Speichern.
+
+Kontrolle in der Objektliste (F7): lbTemplates und teSmsTemplates müssen genau
+so heissen. Sms_Cfg:Dialog() spricht $teSmsTemplates an; fehlt das Objekt,
+lässt sich die Einstellungsmaske nicht mehr öffnen.
+
+Die Vorlagen werden als CONZEPT-Text SMS_VORLAGEN gespeichert. Mehrere Vorlagen werden
+durch eine Zeile mit --- getrennt; eine Vorlage darf mehrere Zeilen haben. Die erste Zeile
+einer Vorlage erscheint als Bezeichnung in der Auswahlliste von "SMS senden".
+
+Beispiel:
+
+  Ihr Auto steht bereit
+  Sie koennen es ab sofort abholen.
+
+  Freundliche Gruesse
+  Garage Muster
+  ---
+  Terminerinnerung
+  Wir erwarten Sie morgen um 08:00 Uhr.

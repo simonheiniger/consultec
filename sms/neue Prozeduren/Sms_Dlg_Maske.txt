@@ -1,0 +1,123 @@
+Maske "Sms_Dlg" — Fenster "SMS senden"
+======================================
+
+Frame im Designer (Datei → Neu → Frame), gespeichert als  Sms_Dlg
+Base → Caption: SMS senden
+
+Die Objektnamen müssen exakt stimmen - Sms_Dlg.prc spricht sie mit $Name an.
+
+
+Skizze (Frame 760 x 560, in der Grösse veränderbar)
+---------------------------------------------------
+
+  +-----------------------------------------------------------------+
+  | SMS senden                                                  [X] |
+  +-----------------------------------------------------------------+
+  |  An:      Carrosserie Muster                     (lbSmsName)    |
+  |  Nummer:  [ 079 927 19 56        ]             (edSmsNumber)    |
+  |                                                                 |
+  |  +-----------------------------------------------------------+  |
+  |  | Guten Tag, Ihr Fahrzeug ist bereit zur Abholung.          |  |
+  |  |                                                           |  |
+  |  |                        (teSmsText)                        |  |
+  |  |                                                           |  |
+  |  |                                                           |  |
+  |  +-----------------------------------------------------------+  |
+  |                                     52 / 160 - 1 SMS            |
+  |                                             (lbSmsCount)        |
+  |  Vorlage:  [ Fahrzeug bereit                            v ]     |
+  |            (edSmsTpl -> plSmsTpl -> dlSmsTpl)                   |
+  |                                                                 |
+  |                             [ Abbrechen ]     [   Senden   ]    |
+  +-----------------------------------------------------------------+
+
+
+TEIL A - sofort baubar
+----------------------
+
+  #  Palette-Reiter  Objekt    Name          Caption      Left Top  Width Height
+  -- --------------  --------  ------------  -----------  ---- ---- ----- ------
+  1  Ausgabe         Label     lbTo          An:            20   15    70    20
+  2  Ausgabe         Label     lbSmsName     (leer)        100   15   300    20
+  13 Ausgabe         Label     lbFromLabel   Absender:     420   15    80    20
+  14 Ausgabe         Label     lbSmsFrom     (leer)        500   15   230    20
+  3  Ausgabe         Label     lbNumber      Nummer:        20   45    70    20
+  4  Eingabe         Edit      edSmsNumber   (leer)        100   43   220    22
+  5  Eingabe         TextEdit  teSmsText     (leer)         20   85   710   150
+  6  Ausgabe         Label     lbSmsCount    (leer)        480  242   250    20
+  7  Ausgabe         Label     lbTpl         Vorlage:       20  275    70    20
+  11 Eingabe         Edit      edSmsTpl      (leer)         95  272   365    22
+                               + plSmsTpl / dlSmsTpl (siehe TEIL B)
+  8  Ausgabe         Label     lbSmsAdrId    (leer)         20  310    50    20
+  15 Schaltflächen   Button    btSmsLog      &Verlauf       20  340   110    28
+  9  Schaltflächen   Button    btSmsCancel   &Abbrechen    500  340   110    28
+  10 Schaltflächen   Button    btSmsSend     &Senden       620  340   110    28
+
+  Frame: AreaWidth 760, AreaHeight 420, Caption "SMS senden"
+
+Einstellungen:
+  - lbSmsAdrId   State → Visible: leer (unsichtbar, merkt sich die Adress-ID)
+  - btSmsCancel  Special → TypeButton _WinBtnClose, Id 2
+  - btSmsSend    Special → TypeButton NICHT _WinBtnClose (Standard lassen)
+                 Key → Default LEER und ReturnKeyClick LEER
+                 (sonst sendet Enter beim Tippen im Textfeld sofort)
+                 Ereignisse → EvtClicked:  Sms_Dlg:EvtClicked
+  - teSmsText    Ereignisse → EvtChanged:  Sms_Dlg:EvtChanged
+                 Eigenschaften → AutoWrap ✓   (Zeilenumbruch am Feldende)
+                 Eigenschaften → LengthMax 160 (eine SMS; im Code zusaetzlich gekuerzt)
+  - btSmsLog     Ereignisse → EvtClicked:  Sms_Dlg:EvtClicked
+                 Special → TypeButton NICHT _WinBtnClose (Standard lassen)
+  - lbSmsFrom    zeigt den Absender aus den SMS-Einstellungen (nur Anzeige)
+
+  Hinweis btSmsSend: Er darf das Fenster nicht selbst schliessen. Bei Fehler oder
+  Testmodus muss das Fenster offen bleiben; bei Erfolg schliesst Sms_Dlg:EvtClicked es.
+
+
+TEIL A2 - Fenster veränderbar machen (später)
+---------------------------------------------
+
+AreaScaling/AreaScalingFlags sind NICHT dafür da - laut Hilfe gelten sie nur für
+Overlays in einem übergeordneten Objekt (DocView).
+
+So macht es Doc_Main:
+  - Frame veränderbar: AreaWidthMin 600, AreaWidthMax -1,
+                       AreaHeightMin 400, AreaHeightMax -1
+  - Mitwachsen der Inhalte: Gruppe "Grouping" (_WinGroupingTileVert) plus
+    AlignGroupingLeftOrder / TopOrder / RightOrder / BottomOrder,
+    im Code zusätzlich wpAlignMarginLeft/Top/Right/Bottom (siehe Doc_Main:View)
+
+Vorgehen: zuerst feste Grösse 760 x 560 bauen und den ganzen Ablauf testen.
+Danach als eigener Schritt Mindestgrössen setzen und das Grouping ergänzen.
+
+TEIL B - Vorlagen-Auswahl (per Kopieren aus Doc_Main)
+------------------------------------------------------
+
+Vorbild in Doc_Main (bestätigt):
+
+  edFromAddress : Edit
+  └─ plFromAddress : PopupList
+     └─ dlFromAddress : DataListPopup     4 Spalten: clmAccName, clmEmailName_Email, zzz, clmAccId
+
+Vorgehen:
+
+ 1. Beide Masken öffnen: Doc_Main (Nur lesend genügt) und Sms_Dlg.
+ 2. In Doc_Main, Objektliste (F7): edFromAddress anklicken → Strg + C.
+ 3. In Sms_Dlg: auf den Frame klicken → Strg + V.
+    Es kommen Edit + PopupList + DataListPopup mitsamt Spalten.
+    Doc_Main NICHT speichern.
+ 4. Umbenennen (Eigenschaften F6 → Base → Name):
+      edFromAddress → edSmsTpl
+      plFromAddress → plSmsTpl
+      dlFromAddress → dlSmsTpl
+ 5. edSmsTpl platzieren: AreaLeft 95, AreaTop 425, AreaWidth 365, AreaHeight 22
+    (auf einer Linie mit lbTpl bei Top 430).
+    Ereignisse von edSmsTpl: alle Einträge leeren, die aus Doc_Main mitkamen.
+ 6. Spalten von dlSmsTpl: Objektliste → Rechtsklick auf dlSmsTpl → "Spalten bearbeiten..." (F2)
+      - clmEmailName_Email und zzz und clmAccId löschen (Knopf unten links mit rotem X)
+      - bleibt:  clmAccName  → umbenennen in clmTplShort,  Visible ✓
+      - neu:     Spalte hinzufügen (Knopf unten links) → Name clmTplText, Visible leer
+      - OK
+    Ergebnis: Spalte 1 = Anzeige (Anfang der Vorlage), Spalte 2 = ganzer Text (unsichtbar).
+ 7. Ereignisse von dlSmsTpl: EvtMouseItem = Sms_Dlg:EvtMouseItem
+    (stand vorher Doc_Evt:EvtMouseItem - ersetzen). Andere Einträge leeren.
+ 8. Speichern.

@@ -1,0 +1,1022 @@
+@A+
+@C+
+@I:Eml_Define
+@I:Doc_Global
+@I:Doc_CtxDefine
+
+//=================================================================================================
+// SetGlobal()
+//=================================================================================================
+sub SetGlobal
+  (
+  aAction : alpha(16);
+  aTableNo : int;
+  aDatId : int;
+  aAlpha1 : alpha(150);
+  aAlpha2 : alpha(150);
+  aSaveMenuDisabled : logic;
+  aView : int;
+  aEmlAccId : int;
+  aIsClone : logic;
+  aDocName : alpha(100);
+  aReplaceVariables : logic;
+  aSerialFunction : logic;
+  aTempFolder : alpha(500);
+  aNewVersion : logic;
+  aTemplateName : alpha(500);
+  ): int;
+local
+  {
+  tCalTime : CalTime;
+  tYear : int;
+  tMonth : int;
+  qEml : handle;
+  tRet : int;
+  }
+{
+VarAllocate(DocGlobal);
+tCalTime->vmServerTime();
+tYear # tCalTime->vpYear;
+tMonth # tCalTime->vpMonth;
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+
+//--- Lizenz ------------------------------------
+gLicenseNumber # StrCut(DbaLicense(_DbaSrvLicense),1,10);
+// gLicenseNumber # 'CS153650WN'; // parfin de siecle
+
+//--- Speicherort E-Mail Archiv -----------------
+FsiPathCreate(Lib_Sys:DbP()+'Emails');
+FsiPathCreate(Lib_Sys:DbP()+'Emails\'+CnvAI(tYear,_FmtNumNoGroup));
+if (tMonth = 12)
+  FsiPathCreate(Lib_Sys:DbP()+'Emails\'+CnvAI(tYear+1,_FmtNumNoGroup));
+
+//--- Speicherort Dokument Archiv ---------------
+FsiPathCreate(Lib_Sys:DbP()+'Documents');
+FsiPathCreate(Lib_Sys:DbP()+'Documents\'+CnvAI(tYear,_FmtNumNoGroup));
+if (tMonth = 12)
+  FsiPathCreate(Lib_Sys:DbP()+'Documents\'+CnvAI(tYear+1,_FmtNumNoGroup));
+
+//--- Temp Path ---------------------------------
+if(aTempFolder = '');
+gTempPath # Mdl_Lib:CreateTempFolder('DocMain');
+
+
+//--- Action ------------------------------------
+gSaved # true;
+gTableNo # aTableNo;
+gDatId # aDatId;
+switch(true)
+  {
+  case (aAction =^ 'opendoc') : gAction # 'DocOpen';
+  case (aAction =^ 'newdoc') : gAction # 'DocNew';
+  case (aAction =^ 'copybin') : return(-1);
+  case (aAction =^ 'delbin') : gAction # 'delbin';
+  default : gAction # aAction;
+  }
+
+//--- Attributes ---------------------------------
+if(aAlpha2 = '') // neue Methode
+  {
+  if(aAlpha1 != '')
+    gFileSrcPNE # Lib_Sys:DbP()+'Documents\'+FsiSplitName(aAlpha1,_FsiNamePN)+'\'+FsiSplitName(aAlpha1,_FsiNameN)+'.fsx';
+  }
+else // alte Metode
+  {
+  switch(aAlpha1)
+    {
+    case 'TempUser','Templates' : aAlpha1 # Lib_Sys:DbP()+'Documents\Templates';
+    }
+  if(StrCut(aAlpha1,StrLen(aAlpha1),1) != '\')
+    aAlpha1 # aAlpha1+'\';
+
+  gFileSrcPNE # aAlpha1+FsiSplitName(aAlpha2,_FsiNamePN)+'\'+FsiSplitName(aAlpha2,_FsiNameN)+'.fsx';
+  }
+
+
+//-----------------------------------------------
+
+gSaveMenuDisabled # aSaveMenuDisabled;
+gIsClone # aIsClone;
+gBinDirTempSys # BinDirOpen(0, 'TempSys', _BinCreate);
+gPrintDataListType# StrCnv("SEB-Art",_StrLower);
+if(gPrintDataListType = '')
+  gPrintDataListType # 'adr';
+gMailDataListType # StrCnv("SEB-Art",_StrLower);
+if(gMailDataListType = '')
+  gMailDataListType # 'adr';
+gView # aView;
+gEmlAccId # aEmlAccId;
+gAccId # aEmlAccId;
+gAccParentId # Eml_Lib:GetParent(aEmlAccId);
+gUserCurrent # CnvIA(UserInfo(_UserCurrent));
+gUserId # Doc_Lib:GetUserNameCurrent();
+gReplaceVariables # aReplaceVariables;
+gSerialFunction # aSerialFunction;
+gNewVersion # aNewVersion;
+gTemplateName #aTemplateName;
+
+gDocName # aAlpha2;
+if (StrFind(gAction,'doc',1,_StrCaseIgnore) != 0)
+  {
+  gDocName # aDocName;
+  }
+
+return(0);
+}
+
+
+//======================================================================================================
+// SetApp()
+//======================================================================================================
+sub SetApp() : logic;
+{
+//--- App ---------------------------------------
+_App->wpRtfMixMarker # '&';
+_App->wpDocMixMarker # '&';
+_App->wpTileTheme # _WinTileThemeEnhanced;
+_App->wpTileSize(_WinTypeTreeView) # 16;
+//--- Ctx Doc Editor ----------------------------
+if (!_App->wpInstallCtxDocEdit)
+  _App->wpInstallCtxDocEdit # true;
+//if (!_App->wpInstallCtxDocEdit)
+//  {
+//  // DocEdit-Erweiterung nicht installiert
+//  WinDialogBox(0,'Fehler',
+//    'SwissText Erweiterung konnte nicht installiert werden.'+ StrChar(13) + StrChar(10) +
+//    'Die Anwendung wird beendet.',_WinIcoError,_WinDialogOk,0);
+//  return false;
+//  }
+return true;
+}
+
+
+
+//=================================================================================================
+// InserToUpdate()
+//=================================================================================================
+sub InserToUpdate
+  (
+  aAction : alpha;
+  aId : int;
+  )
+{
+gAction # aAction;
+gDatId # aId;
+}
+
+
+
+//=================================================================================================
+// TemplateEmailSave()
+//=================================================================================================
+sub TemplateEmailSave
+  (
+  aAccId : int;
+  aName : alpha(500);
+  )
+local
+  {
+  }
+{
+Doc_Lib:EmailSave($CtxDocEdit,2,$edToAddress->wpCaption,aName,Eml_Lib:GetFolder(aAccId,'temp'),Mdl_Lib:GetCH($chNotify));
+Eml_Redraw:Set('Doc_Evt:EvtMenuCommand','Ext','AccFolder','LstKeep',Eml_Lib:GetFolder(aAccId,'temp'));
+}
+
+
+
+
+// ================================================================================================
+//   SetSaveStatus()
+// ================================================================================================
+sub SetSaveStatus
+  (
+  aStatus : alpha(10);
+  )
+{
+//--- Speichern deaktivieren ---
+if (gSaveMenuDisabled = true)
+  aStatus # 'Off';
+
+switch (aStatus)
+  {
+  case 'New' :
+    {
+    //$sbnText->wpImageTile # _WinImgNew;
+    $sbnText->wpHelpTip # 'Datei wurde neu angelegt.'
+    $miSave->wpDisabled # false;
+    gSaved # false;
+    }
+  case 'Saved' :
+    {
+    //$sbnText->wpImageTile # _WinImgSave;
+    $sbnText->wpHelpTip # 'Datei ist in dieser Form gespeichert.'
+    $miSave->wpDisabled # true;
+    gSaved # true;
+    }
+  case 'NotSaved' :
+    {
+    //$sbnText->wpImageTile # _WinImgClear;
+    $sbnText->wpHelpTip # 'Datei ist in dieser Form noch nicht gespeichert.'
+    $miSave->wpDisabled # false;
+    gSaved # false;
+    }
+  case 'Off' :
+    {
+    //$sbnText->wpImageTile # _WinImgSave;
+    $sbnText->wpHelpTip # 'Temporäre Datei'
+    $miSave->wpDisabled # true;
+    gSaved # true;
+    }
+  }
+}
+
+
+//======================================================================================================
+//  View()
+//======================================================================================================
+sub View
+  (
+  aAction : alpha(10);
+  aSerialFunction : logic;
+  opt aInit : logic;
+  )
+{
+if(!aInit)
+  SetSaveStatus('NotSaved');
+
+
+switch(aAction)
+  {
+  case'EmlSingle' :
+    {
+    //--- View ----------------------------------
+    gView # 1;
+    gFrmMain->WinUpdate(_WinUpdOff);
+    //--- Brauch ich sonst geht der MarginLeft nicht ! ----------
+    gCtx->wpAreaTop # 0;
+    gCtx->wpAlignMarginLeft # 1;
+    gCtx->wpAlignMarginTop # 1;
+    gCtx->wpAlignMarginRight # 1;
+    gCtx->wpAlignMarginBottom # 1;
+    //-------------------------------------------
+    gCtx->WinUpdate(_WinUpdOff);
+    //--- Menü ----------------------------------
+    $miViewEml->wpMenuCheck # true;
+    $miViewDoc->wpMenuCheck # false;
+    $miViewHtml->wpMenuCheck # false;
+    $miViewEml->wpCaption # 'E-&Mail  Editor';
+    $miViewDoc->wpCaption # '&Brief Editor                                    Strg + M';
+    //--- ToolBox -------------------------------
+    $gbToolBox->wpDisabled # false;
+    //--- Email Header --------------------------
+    $gbEmlHeader->wpDisabled # false;
+    $gbEmlHeader->wpVisible # true;
+    $gbPreview->wpVisible # false;
+    //--- Print Header --------------------------
+    $gbPrintHeader->wpDisabled # true;
+    $gbPrintHeader->wpVisible # false;
+
+    //--- ViewMode ------------------
+    gCtx->wpViewMode # _WinViewModeFloating;
+    gCtx->wpVisible # true;
+    $wnPreview->wpVisible # false;
+    //--- Statusbar -----------------------------
+    $sbStatus->wpVisible # false;
+    //--- Lineal ausblenden ---------------------
+    gCtx->wpToolbars # gCtx->wpToolbars & ~_WinToolbarRulerH;
+    gCtx->wpToolbars # gCtx->wpToolbars & ~_WinToolbarRulerV;
+    //--- Fokus ---------------------------------
+    gCtx->WinFocusSet(true);
+    gCtx->WinUpdate(_WinUpdOn);
+    gFrmMain->WinUpdate(_WinUpdOn);
+    //--- Margin --------------------------------
+    gCtx->wpAlignMarginLeft # 10;
+    gCtx->wpAlignMarginTop # 10;
+    gCtx->wpAlignMarginRight # 0;
+    gCtx->wpAlignMarginBottom # 0;
+    }
+  case'Doc' :
+    {
+    //--- Brauch ich sonst geht der MarginLeft nicht ! ----------
+    gCtx->wpAreaTop # 0;
+    gCtx->wpAlignMarginLeft # 1;
+    gCtx->wpAlignMarginTop # 1;
+    gCtx->wpAlignMarginRight # 1;
+    gCtx->wpAlignMarginBottom # 1;
+    //--- View ----------------------------------
+    gView # 0;
+    gFrmMain->WinUpdate(_WinUpdOff);
+    gCtx->WinUpdate(_WinUpdOff);
+    //--- Menü ----------------------------------
+    $miViewEml->wpMenuCheck # false;
+    $miViewDoc->wpMenuCheck # true;
+    $miViewHtml->wpMenuCheck # false;
+    $miViewEml->wpCaption # 'E-&Mail  Editor                                  Strg + M';
+    $miViewDoc->wpCaption # '&Brief Editor';
+    //--- ToolBox -------------------------------
+    $gbToolBox->wpDisabled # false;
+    //--- Email Header --------------------------
+    $gbEmlHeader->wpDisabled # false;
+    $gbEmlHeader->wpVisible # false;
+    $gbPreview->wpVisible # false;
+    //--- Print Header --------------------------
+    $gbPrintHeader->wpDisabled # false;
+    $gbPrintHeader->wpVisible # true;
+    //--- ViewMode ------------------
+    gCtx->wpViewMode # _WinViewModePage;
+    gCtx->wpVisible # true;
+    $wnPreview->wpVisible # false;
+    //--- Statusbar -----------------------------
+    $sbStatus->wpVisible # true;
+    //--- Lineal einblenden ---------------------
+    gCtx->wpToolbars # gCtx->wpToolbars | _WinToolbarRulerH;
+    gCtx->wpToolbars # gCtx->wpToolbars | _WinToolbarRulerV;
+    //--- Fokus ---------------------------------
+    gCtx->WinFocusSet(true);
+    gFrmMain->WinUpdate(_WinUpdOn);
+    gCtx->WinUpdate(_WinUpdOn);
+    //--- Margin --------------------------------
+    gCtx->wpAreaTop # 0;
+    gCtx->wpAlignMarginLeft # 0;
+    gCtx->wpAlignMarginTop # 0;
+    gCtx->wpAlignMarginRight # 0;
+    gCtx->wpAlignMarginBottom # 0;
+    }
+  case'Html' :
+    {
+    //--- View ----------------------------------
+    gView # 3;
+    gFrmMain->WinUpdate(_WinUpdOff);
+    //--- Preview -------------------------------
+    Doc_Send:PreviewContent();
+    $wnPreview->wpCaption # '';
+    $wnPreview->wpCaption # gTempPath+'Send.html';
+    //--- Menue ---------------------------------
+    $miViewHtml->wpMenuCheck # true;
+    //--- ToolBox -------------------------------
+    $gbToolBox->wpDisabled # true;
+    //--- Email Header --------------------------
+    $gbEmlHeader->wpDisabled # true;
+    $gbPreview->wpVisible # true;
+    $dvDocEdit->wpVisible # true;
+    //--- Statusbar -----------------------------
+    $sbStatus->wpVisible # false;
+    //--- ViewMode ------------------
+    gCtx->wpVisible # false;
+    $wnPreview->wpVisible # true;
+    gFrmMain->WinUpdate(_WinUpdOn);
+    }
+  }
+//--- Serialfunction ----------------------------
+if(aSerialFunction)
+  {
+  gSerialFunction # aSerialFunction;
+  $miSerialFunction->wpMenuCheck # true;
+  $edToAddress->wpVisible # false;
+  $laToAdress->wpVisible # true;
+  if($mailSendSingle > 0)
+    {
+    $mailSendSingle->wpName # 'OpenMailMulti';
+    $mailSendSingle->wpCaption # 'Serien E-Mail...';
+    }
+  $chNotify->wpDisabled # true;
+  if(aAction = 'Doc')
+    $gbPrintHeader->wpVisible # true;
+  }
+else
+  {
+  gSerialFunction # aSerialFunction;
+  $miSerialFunction->wpMenuCheck # false;
+  $edToAddress->wpVisible # true;
+  $laToAdress->wpVisible # false;
+  if($OpenMailMulti > 0)
+    {
+    $OpenMailMulti->wpName # 'mailSendSingle';
+    $OpenMailMulti->wpCaption # 'Senden';
+    }
+  $chNotify->wpDisabled # false;
+  if(aAction = 'Doc')
+    $gbPrintHeader->wpVisible # false;
+  }
+
+
+//--- Fokus -------------------------------------
+switch ('')
+  {
+  case $edToAddress->wpCaption : $edToAddress->WinFocusSet();
+  case $edSubject->wpCaption : $edSubject->WinFocusSet();
+  default : gCtx->WinFocusSet(true);
+  }
+}
+
+
+//======================================================================================================
+//  Hilfe Datei Downloaden und anzeigen
+//======================================================================================================
+sub Help()
+{
+Call('FTP_Main','d','forrersoftware.ch',21,'forrer2','v70La*s4', 'SwissTextHelp.pdf','SwissText.pdf');
+SysExecute('*SwissTextHelp.pdf','',0);
+}
+
+//======================================================================================================
+//  Logfile schreiben
+//======================================================================================================
+sub WriteLog
+  (
+  aAction : Alpha(16); // mail,email,mailmulti,emailmulti
+  aAddId : int;
+  )
+local
+  {
+  tErr : int;
+  tBufText : handle;
+  tBufAdr : handle;
+  tAdrIdAlpha : alpha(16);
+  tTextName : alpha(32);
+  tDate : date;
+  tDateAlpha : alpha(16);
+  tLine : alpha(255);
+  }
+{
+tBufAdr # RecBufCreate(1);
+tBufAdr->"ADR-DatIdt" # aAddId;
+tErr # RecRead(tBufAdr,1,0);
+if (tErr != 0)
+  return;
+tBufText # TextOpen(512);
+tAdrIdAlpha # CnvAI(aAddId,_FmtNumNoGroup);
+tTextName # 'AKOM-' + tAdrIdAlpha;
+tDate->vmServerTime();
+tDateAlpha # CnvAD(tDate, _FmtInternal);
+
+if (tBufAdr->"ADR-KommText" = N)
+  {
+  RecRead(tBufAdr,1,_RecLock);
+  tBufAdr->"ADR-KommText" # Y;
+  tBufAdr->"ADR-KomText" # tTextName;
+  RecReplace(tBufAdr,_RecUnLock);
+  }
+RecBufDestroy(tBufAdr);
+tErr # TextCreate(tTextName,0);
+tErr # tBufText->TextRead(tTextName,0);
+switch(aAction)
+  {
+  case 'mail' :
+    {
+    if ("KOM-ZHD DatIdt" = 0)
+      tLine # 'Brief vom '+tDateAlpha+' '+gDocName;
+    else
+      tLine # 'Brief vom '+tDateAlpha+' '+gDocName+ ' '+"ZHD-Name"+','+ "ZHD-Vorname";
+    }
+  case 'email' :
+    {
+    if ("KOM-ZHD DatIdt" = 0)
+      tLine # 'E-Mail vom '+tDateAlpha+' '+$edSubject->wpCaption;
+    else
+      tLine # 'E-Mail vom '+tDateAlpha+' '+$edSubject->wpCaption+ ' '+"ZHD-Name"+','+ "ZHD-Vorname";
+    }
+  case 'mailmulti' :
+    {
+    if ("KOM-ZHD DatIdt" = 0)
+      tLine # 'Serienbrief vom '+tDateAlpha+' '+gDocName;
+    else
+      tLine # 'Serienbrief vom '+tDateAlpha+' '+gDocName+ ' '+"ZHD-Name"+','+ "ZHD-Vorname";
+    }
+  case 'emailmulti' :
+    {
+    if ("KOM-ZHD DatIdt" = 0)
+      tLine # 'Serien E-Mail vom '+tDateAlpha+' '+gDocName;
+    else
+      tLine # 'Serien E-Mail vom '+tDateAlpha+' '+gDocName+ ' '+"ZHD-Name"+','+ "ZHD-Vorname";
+    }
+   
+  case 'sms' :
+    {
+    if ("KOM-ZHD DatIdt" = 0)
+      tLine # 'SMS vom '+tDateAlpha+' '+gDocName;
+    else
+      tLine # 'SMS vom '+tDateAlpha+' '+gDocName+ ' '+"ZHD-Name"+','+ "ZHD-Vorname";
+    }
+  }
+//--- Text schreiben ------------------------------
+If (tBufText->TextSearch(1,1,_TextSearchCI,tLine)=0)
+    tBufText->TextLineWrite(1,tLine,_TextLineInsert );
+
+tErr # tBufText->TextWrite(tTextName,0);
+tBufText->TextClose();
+}
+
+//================================================================================================
+//   InsertDialog()
+//================================================================================================
+sub InsertDialog
+  (
+  aCtx : handle;
+  aAction : alpha;
+  aTableNo : int;
+  aDatId : int;
+  aFileSrcPNE : alpha(500);
+  aEmlAccId : int;
+  aNotify : logic;
+  aView : int;
+  aDocName : alpha(500);
+  var aSaveAction : int;
+  var tCloseApp : logic;
+  ): logic;
+local
+  {
+  tRet : int;
+  tFrame : handle;
+  }
+{
+tFrame # Lib_Frm:Open('Doc_SaveNew');
+$edDocName->wpcaption # aDocName;
+
+Mdl_Lib:SetCh($FileTypeText,false);
+Mdl_Lib:SetCh($rbLetter,false);
+Mdl_Lib:SetCh($rbSerialLetter,false);
+
+switch(aTableNo)
+  {
+  case 130 : Mdl_Lib:SetCh($FileTypeText,true);
+  case 140 : Mdl_Lib:SetCh($rbLetter,true);
+  case 141 : Mdl_Lib:SetCh($rbSerialLetter,true);
+  }
+Lib_Frm:Run(tFrame,$Doc_Main);
+
+
+aDocName # $edDocName->wpcaption;
+switch(true)
+  {
+  case Mdl_Lib:GetCh($FileTypeText) : aTableNo # 130;
+  case Mdl_Lib:GetCh($rbLetter) : aTableNo # 140;
+  case Mdl_Lib:GetCh($rbSerialLetter) : aTableNo # 141;
+  }
+
+
+tRet # WinDialogResult(tFrame);
+switch(tRet)
+  {
+  case 1 : // Yes
+    {
+    aSaveAction # 1;
+    Doc_Lib:DocInsert(aCtx,aTableNo,aFileSrcPNE,aDocName,aNotify,aView);
+
+    if (gSaved)
+      tCloseApp # true;
+    else
+      tCloseApp # false;
+    }
+  case 0 : // No
+    {
+    aSaveAction # 0;
+    tCloseApp # true;
+    }
+  case -1 : // cancel
+    {
+    aSaveAction # -1;
+    tCloseApp # false;
+    }
+  }
+WinClose(tFrame);
+}
+
+//================================================================================================
+//   SaveDialog()
+//================================================================================================
+sub SaveDialog
+  (
+  aCtx : handle;
+  aAction : alpha;
+  aTableNo : int;
+  aDatId : int;
+  aEmlAccId : int;
+  aNotify : logic;
+  aView : int;
+  aDocName : alpha(500);
+  var aSaveAction : int;
+  var tCloseApp : logic;
+  ): logic;
+local
+  {
+  tRet : int;
+  tFrame : handle;
+  }
+{
+tFrame # Lib_Frm:Open('Doc_Save');
+Lib_Frm:Run(tFrame,$Doc_Main);
+
+tRet # WinDialogResult(tFrame);
+
+switch(tRet)
+  {
+  case 1 : // Yes
+    {
+    aSaveAction # 1;
+    Doc_Lib:DocSave(aCtx,aAction,aTableNo,aDatId,aEmlAccId,aNotify,aView);
+    if (gSaved)
+      tCloseApp # true;
+    else
+      tCloseApp # false;
+    }
+  case 0 : // No
+    {
+    aSaveAction # 0;
+    tCloseApp # true;
+    }
+  case -1 : // cancel
+    {
+    aSaveAction # -1;
+    tCloseApp # false;
+    }
+  }
+WinClose(tFrame);
+}
+
+//================================================================================================
+//  Save()
+//================================================================================================
+sub Save
+  (
+  aCtx : handle;
+  aAction : alpha;
+  aTableNo : int;
+  aDatId : int;
+  aFileSrcPNE : alpha(500);
+  aEmlAccId : int;
+  aNotify : logic;
+  aView : int;
+  aDocName : alpha(500);
+  var aSaveAction : int;
+  var tCloseApp : logic;
+  ): logic;
+local
+  {
+  tRet : int;
+  tFrame : handle;
+  }
+{
+if(aAction = 'DocNew')
+  {
+  InsertDialog(gCtx,gAction,gTableNo,gDatId,gFileSrcPNE,gEmlAccId,Mdl_Lib:GetCh($chNotify),gView,gDocName,var gSaveAction, var tCloseApp);
+  }
+else
+  {
+  SaveDialog(gCtx,gAction,gTableNo,gDatId,gEmlAccId,Mdl_Lib:GetCh($chNotify),gView,gDocName,var gSaveAction, var tCloseApp);
+  }
+}
+
+//================================================================================================
+//  SaveDialogOld()
+//================================================================================================
+sub SaveDialogOld
+  (
+  aCtx : handle;
+  aAction : alpha;
+  aTableNo : int;
+  aDatId : int;
+  aFileSrcPNE : alpha(500);
+  aEmlAccId : int;
+  aNotify : logic;
+  aView : int;
+  var aSaveAction : int;
+  var tCloseApp : logic;
+  ): logic;
+local
+  {
+  tRet : int;
+  }
+{
+tRet # WinDialogBox(gFrmMain, 'Speichern', 'Möchten Sie die Änderungen in der Datei speichern?', _WinIcoQuestion, _WinDialogYesNoCancel, _WinIDYes);
+switch(tRet)
+  {
+  case _WinIDYes :
+    {
+    aSaveAction # 1;
+    Doc_Lib:DocSaveOld(aCtx,aAction,aTableNo,aDatId,aFileSrcPNE,aEmlAccId,aNotify,aView);
+    if (gSaved)
+      tCloseApp # true;
+    else
+      tCloseApp # false;
+    }
+  case _WinIDNo :
+    {
+    aSaveAction # 0;
+    tCloseApp # true;
+    }
+  case _WinIDCancel :
+    {
+    aSaveAction # -1;
+    tCloseApp # false;
+    }
+  }
+}
+
+
+//================================================================================================
+//   Print()
+//================================================================================================
+sub Print
+  (
+  aFrmMain : handle;
+  aCtx : handle;
+  aSerialFunction : logic;
+  aView : int;
+  aWriteLog : logic;
+  )
+local
+  {
+  tWinPrint : handle;
+  tPrinter        : handle;
+  tInputPos       : handle;
+  tRange          : alpha(250);
+  tCurrentPage    : int;
+  tRet : int;
+  }
+{
+if(aView = 1)
+  {
+  tRet # WinDialogBox(aFrmMain,'','Drucken nur in Brief-Ansicht möglich.'+sBR+'Möchten Sie zur Brief-Ansicht wechseln?',_WinIcoQuestion,_WinDialogYesNo,1);
+  if(tRet = _WinIdYes)
+    {
+    View('Doc',aSerialFunction);
+    }
+  else
+    {
+    return;
+    }
+  }
+
+Lib_Frm:Print(aFrmMain,aCtx,aWriteLog);
+
+}
+
+//======================================================================================================
+//   Clone()
+//======================================================================================================
+sub Clone
+  (
+  aAction : alpha(16); // new,load,delete
+  aTableNo : int;
+  aDatId : int;
+  opt aAlpha1 : alpha(150);
+  opt aAlpha2 : alpha(150);
+  opt aAlpha3 : alpha(150);
+  opt aAlpha4 : alpha(150);
+  opt aSaveMenuDisabled : logic;
+  opt aView : int;
+  opt aEmlAccId : int;
+  opt aIsClone : logic;
+  opt aSaveAsTemplate : logic;
+  opt aReplaceVariables : logic;
+  opt aSerialFunction : logic;
+  opt aTempPath : alpha(500);
+  opt aNewVersion : logic;
+  opt aTemplateName : alpha(500);
+  )
+
+{
+SysClone(_CloneStandard,'Doc_Clone',
+  '/c16splashon=n'+
+  ' /aAction='+aAction+
+  ' /aTableNo='+CnvAI(aTableNo,_FmtNumNoGroup)+
+  ' /aDatId='+CnvAI(aDatId,_FmtNumNoGroup)+
+  ' /aAlpha1='+aAlpha1+
+  ' /aAlpha2='+aAlpha2+
+  ' /aAlpha3='+aAlpha3+
+  ' /aAlpha4='+aAlpha4+
+  ' /aSaveMenuDisabled='+CnvAI(CnvIL(aSaveMenuDisabled))+
+  ' /aView='+CnvAI(aView,_FmtNumNoGroup)+
+  ' /aEmlAccId='+CnvAI(aEmlAccId,_FmtNumNoGroup)+
+  ' /aIsClone=1'+
+  ' /aSaveAsTemplate='+CnvAI(CnvIL(aSaveAsTemplate))+
+  ' /aReplaceVariables='+CnvAI(CnvIL(aReplaceVariables))+
+  ' /aSerialFunction='+CnvAI(CnvIL(aSerialFunction))+
+  ' /aTempPath='+aTempPath+
+  ' /aNewVersion='+CnvAI(CnvIL(aNewVersion))+
+  ' /aTemplateName='+aTemplateName
+  );
+}
+
+//=================================================================================================
+// DocReturn()
+//=================================================================================================
+sub DocReturn
+  (
+  aTableNo : int;
+  qDoc : handle;
+  aSaveAction : int; // 1 Yes, 0 No, -1 Cancel
+  aView : int;
+  )
+local
+  {
+  tBlobName : alpha(50);
+  tEmail : logic;
+  tNotification : logic;
+  }
+{
+tNotification # Doc_Lib:GetNotification(aTableNo);
+//--- BlobName ----------------------------------
+tBlobName # Doc_Lib:GetBlobNameOld(aTableNo);
+
+//--- DB Buffer ---------------------------------
+RecBufCopy(qDoc,aTableNo);
+
+//--- BlobName ----------------------------------
+if(aSaveAction = 1)
+  {
+  Doc_Lib:SetBlobName(aTableNo,tBlobName);
+  }
+else
+  {
+  if(gAction = 'DocNew') // nicht gespeichert
+    {
+    Doc_Lib:SetBlobName(aTableNo,'');
+
+    switch(aTableNo)
+      {
+      //case 100 : "FAK-Bezeichnung" # ''; // Rechnung FAK
+      case 130 : "TXT-Bezeichnung" # ''; // Text TXT
+      case 140 : "KOM-Bezeichnung" # ''; // Brief KOM
+      case 141 : "SEB-Bezeichnung" # ''; // serien Brief SEB
+      //case 150 : "WAU-Bezeichnung" # ''; // Werkstattauftrag WAU
+      //case 160 : "BES-Bezeichnung" # ''; // Bestellung BES
+      }
+    }
+  }
+
+
+//--- View ------------------------------------------
+if(aView = 1)
+  tEmail #true;
+switch(aTableNo)
+    {
+    //case 100 : "FAK-EMail" # tEmail; // Rechnung FAK
+    case 130 : "TXT-EMail" # tEmail; // Text TXT
+    case 140 : "KOM-EMail" # tEmail; // Brief KOM
+    case 141 : "SEB-EMail" # tEmail; // serien Brief SEB
+    //case 150 : "WAU-EMail" # tEmail; // Werkstattauftrag WAU
+    //case 160 : "BES-EMail" # tEmail; // Bestellung BES
+    }
+
+//--- Notification ------------------------------
+if(aSaveAction != 0)
+  Doc_Lib:SetNotification(aTableNo,tNotification);
+
+RecBufDestroy(qDoc);
+}
+
+//======================================================================================================
+//   Main()
+//======================================================================================================
+main
+  (
+  aAction : alpha(16); // new,load,delete,del
+  aTableNo : int;
+  aId : int;
+  opt aAlpha1 : alpha(150);
+  opt aAlpha2 : alpha(150);
+  opt aAlpha3 : alpha(150); // not used
+  opt aAlpha4 : alpha(150); // not used
+  opt aSaveMenuDisabled : logic;
+  opt aView : int;
+  opt aEmlAccId : int;
+  opt aIsClone : logic;
+  opt aSaveAsTemplate : logic;
+  opt aReplaceVariables : logic;
+  opt aSerialFunction : logic;
+  opt aTempPath : alpha(500);
+  opt aNewVersion : logic;
+  opt aTemplateName : alpha(500);
+  )
+local
+  {
+  tRet : int;
+  tLet : logic;
+  tIsCLone : logic;
+  qDoc : handle;
+  aDocName : alpha(100);
+  aToAdress : alpha(200);
+  tVersion : int;
+  }
+{
+//bgConnect('*',n,n);
+
+//--- Error -------------------------------------
+ErrCall('Doc_Error');
+
+//--- DB Path -----------------------------------
+Lib_Sys:DbP();
+
+
+tVersion # DbaInfo(_DbaClnRelMaj)*10000 + DbaInfo(_DbaClnRelMin)*100 + DbaInfo(_DbaClnRelRev);
+if(tVersion < 050711)
+  {
+  WinDialogBox(0,'','SwissText '+ sVersion+' benötigt ein Upgrade von Conzept 16'+sBR+sBR+'Gehen Sie zu:'+sBR+'Service | Senden/Empfangen | Upgrade Conzept 16 ',_WinIcoError,_WinDialogOK,1); // +CnvAI(tVersion)
+  Lib_Error(sVersion,'SwissText | Neue Version erforderlich','Neue Version erforderlich',true,'');
+  return;
+  }
+
+//--- Atributte ---------------------------------
+aDocName # Doc_Lib:GetDocNameOld(aTableNo,aId);
+
+//--- App ---------------------------------------
+tLet # SetApp();
+if(!tLet)
+  return;
+
+//--- DB Buffer ---------------------------------
+if(aTableNo > 0)
+  {
+  qDoc # RecBufCreate(aTableNo);
+  RecBufCopy(aTableNo,qDoc);
+  }
+//--- Global ------------------------------------
+tRet # SetGlobal(
+          aAction,
+          aTableNo,
+          aId,
+          aAlpha1
+          ,aAlpha2,
+          aSaveMenuDisabled,
+          aView,
+          aEmlAccId,
+          aIsClone,
+          aDocName,
+          aReplaceVariables,
+          aSerialFunction,
+          aTempPath,
+          aNewVersion,
+          aTemplateName);
+
+
+if (tRet < 0)
+  return;
+//--- Versionen ---------------------------------
+tLet # Doc_Version();
+if(!tLet)
+  return;
+
+//--- Aktionen ----------------------------------
+if(aAction = 'delbin')
+  {
+  Doc_Lib:FileDelete(Lib_Sys:DbP()+FsiSplitName(aAlpha1+'\'+aAlpha2,_FsiNameP)+FsiSplitName(aAlpha2,_FsiNameN)+'\');
+  //--- TempFolder ------------------------------
+  Mdl_Lib:DeleteTempFolder(gTempPath);
+  if(tIsCLone =  true)
+    WinHalt();
+  return;
+  }
+
+
+//--- Datum setzen ------------------------------
+"GV-Datum1"->vmServerTime();
+//--- Open ------------------------------------
+gFrmMain # WinOpen('Doc_Main',_WinOpenDialog);
+gFrmMain->WinSearchPath();
+
+//--- Colors ------------------------------------
+$btAttAdd2->wpColBkg # sBlue2;
+$gbEmlHeader->wpColBkg # sGray2;
+$gbPrintHeader->wpColBkg # sGray2;
+
+gFrmMain->wpVisible # false;
+gCtx # $CtxDocEdit;
+
+
+if(!"Sys-Mail")
+  {
+  $miContact->wpDisabled # true;
+  $miContact->wpcaption # 'Adressbuch  [Option von SwissMail]';
+  }
+//--- Pref ------------------------------------
+Eml_Pref:Start(var gPref,gUserId);
+Eml_Pref:DocFrmOpen(gPref,gFrmMain);
+//--- Run -------------------------------------
+WinDialogRun(gFrmMain,_WinDialogCreateHidden);
+
+//--- Preferences -------------------------------
+Eml_Pref:DocFrmClose(gPref,gFrmMain,gUserID);
+Eml_Pref:Save(gPref,gUserID);
+//--- TempFolder ------------------------------
+Mdl_Lib:DeleteTempFolder(gTempPath);
+//--- Close -----------------------------------
+tIsCLone # gIsCLone;
+if (gBinFile != 0)
+  gBinFile->BinClose();
+WinClose(gFrmMain);
+
+DocReturn(aTableNo,qDoc,gSaveAction,gView);
+
+VarFree(DocGlobal);
+
+if(tIsCLone =  true)
+  WinHalt();
+return;
+}
+
+
+
+

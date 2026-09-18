@@ -1,0 +1,19 @@
+{
+ŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠ…
+ƒName  :SYS-Info Email            ƒ
+ƒZweck :                          ƒ
+ƒ                                 ƒ
+ƒAufruf:                          ƒ
+ƒDatum :                          ƒ
+ƒProg. durch: sf                  ƒ
+†ŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŒ}
+VAR Laufwerk # IntS
+begin
+TextInsLine(1,TextLineCnt(1) + 1,:999,1,1:);
+
+TextInsLine(1,TextLineCnt(1) + 1,:SYS-Absender1:);
+TextInsLine(1,TextLineCnt(1) + 1,:SYS-Absender2:);
+TextInsLine(1,TextLineCnt(1) + 1,:SYS-Absender3:);
+TextInsLine(1,TextLineCnt(1) + 1,:SYS-Land: + ' ' + Alpha(:SYS-AbsenderPLZ:,5,0) + ' ' + :SYS-AbsenderOrt:);
+TextInsLine(1,TextLineCnt(1) + 1,'');
+end

@@ -1,0 +1,84 @@
+@A+
+@C+
+
+//=================================================================================================
+// Define
+//=================================================================================================
+define
+  {
+  sVersion              :  '1.00'
+  }
+
+//=================================================================================================
+// Download
+//=================================================================================================
+sub Download
+  (
+  aURI : alpha(512);
+  aDestFile : alpha(512);
+  ): int; // -1 Server Adress Error | -2 File Not Found
+local
+  {
+  tPos : int;
+  tHost : alpha(128);
+  tPath : alpha(512);
+  tSck : handle;
+  tReqest : handle;
+  tLst : handle;
+  tResponse : handle;
+  tFsi : handle;
+  tErr : int;
+  }
+{
+try
+  {
+  //--- URI Path --------------------------------
+  if (!(aURI =* 'http://*'))
+    ErrSet(-2);
+  tPos # StrFind(aURI,'/',8);
+  if (tPos = 0)
+    {
+    tHost # StrCut(aURI,8,StrLen(aURI)-7);
+    tPath # '/';
+    }
+  else
+    {
+    tHost # StrCut(aURI,8,tPos-8);
+    tPath # StrCut(aURI,tPos,StrLen(aURI)+1-tPos);
+    }
+  //--- Connect ---------------------------------
+  tSck # SckConnect(tHost,80,0,10000);
+  //--- Request ---------------------------------
+  tReqest # HttpOpen(_HttpSendRequest,tSck);
+  tLst # tReqest->spHttpHeader;
+  tReqest->spURI # tPath;
+  tReqest->spProtocol # 'HTTP/1.1';
+  tLst->CteInsertItem('Host', 0, tHost);
+  tLst->CteInsertItem('Accept', 0, '*/*');
+  tReqest->HttpClose(_HttpCloseConnection);
+  tReqest # 0;
+  //--- Receive ---------------------------------
+  tResponse # HttpOpen(_HttpRecvResponse, tSck);
+  if (tResponse->spStatusCode =* '200*' /*and tResponse->spContentLength > 0*/)
+    {
+    //--- Save File -----------------------------
+    tFsi # FsiOpen(aDestFile, _FsiStdWrite);
+    tResponse->HttpGetData(tFsi);
+    }
+  else
+    {
+    ErrSet(-2);
+    }
+  }
+tErr # ErrGet();
+//--- End ---------------------------------------
+if (tReqest > 0)
+  tReqest->HttpClose(_HttpDiscard);
+if (tFsi > 0)
+  tFsi->FsiClose();
+if (tResponse > 0)
+  tResponse->HttpClose(0);
+if (tSck > 0)
+  tSck->SckClose();
+return(tErr);
+}

@@ -1,0 +1,52 @@
+Patch für Doc_Send:SendSingle()
+==============================
+
+Einfügen als ERSTER Block im Rumpf von sub SendSingle() (aktuell Zeile 765,
+direkt nach der öffnenden Klammer, vor "//--- Check Subject ---").
+
+Grund: Bei einer SMS gibt es weder Betreff noch Anhänge noch HTML — die
+Prüfungen und der ganze Mail-Aufbau werden übersprungen.
+
+Zusätzliche lokale Variablen in SendSingle deklarieren:
+
+  tSmsText  : alpha(4096);
+  tSmsError : alpha(1000);
+  tSmsTempP : alpha(1000);
+
+--- Einzufügender Block -------------------------------------------------------
+
+//--- SMS statt E-Mail --------------------------
+if ($edToAddress->wpCaption =* 'sms:*')
+  {
+  tSmsTempP # Mdl_Lib:CreateTempFolder('SendSms');
+  Sms_Text:FromContext(gCtx,tSmsTempP,var tSmsText);
+  Mdl_Lib:DeleteTempFolder(tSmsTempP);
+
+  if (Sms_Send:Send($edToAddress->wpCaption,tSmsText,"ADR-DatIdt",var tSmsError))
+    {
+    Doc_Main:WriteLog('sms',"ADR-DatIdt");
+    gFrmMain->WinClose();
+    return(0);
+    }
+
+  WinDialogBox(gFrmMain,'SMS',tSmsError,_WinIcoError,_WinDialogOK,1);
+  return(-1);
+  }
+
+--- Ende ----------------------------------------------------------------------
+
+Hinweise
+--------
+
+1. "ADR-DatIdt" wird auch im bestehenden Erfolgspfad verwendet
+   (Doc_Main:WriteLog('email',"ADR-DatIdt")) — gleiche Quelle, gleiche Semantik.
+
+2. Kein Eintrag im Ordner "Gesendet": Doc_Lib:EmailSave() wird bewusst nicht
+   aufgerufen, eine SMS ist keine Mail. Das technische Protokoll übernimmt
+   Sms_Log:Write(), die Historie Doc_Main:WriteLog('sms',...).
+
+3. SendMulti() (Serien-E-Mail) bleibt vorerst unverändert. Serien-SMS wäre
+   dieselbe Weiche an der Stelle Zeile 978 — nicht Teil des Auftrags.
+
+4. SendTestMail() bleibt unverändert; der SMS-Testversand läuft über
+   testMode=1 in der SMS-Konfiguration.

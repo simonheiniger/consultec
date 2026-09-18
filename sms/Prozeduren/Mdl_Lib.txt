@@ -1,0 +1,844 @@
+@A+
+@C+
+
+
+//=================================================================================================
+// GetVersion()
+//=================================================================================================
+sub GetVersion
+  (
+  aVersion : int;
+  ) : alpha;
+local
+  {
+  tVersion : Alpha;
+  tAlpha : alpha;
+  tInt1 : int;
+  tInt2 : int;
+  tInt3 : int;
+  }
+{
+tAlpha # CnvAI(aVersion,_FmtNumLeadZero | _FmtNumNoGroup,0,6);
+tInt1 # CnvIA(StrCut(tAlpha,1,2));
+tInt2 # CnvIA(StrCut(tAlpha,3,2));
+tInt3 # CnvIA(StrCut(tAlpha,5,2));
+
+if(tInt3 = 0)
+  tVersion # CnvAI(tInt1)+'.'+CnvAI(tInt2);
+else
+  tVersion # CnvAI(tInt1)+'.'+CnvAI(tInt2)+'.'+CnvAI(tInt3);
+return(tVersion);
+}
+
+
+
+//=================================================================================================
+// GetCh()
+//=================================================================================================
+sub GetCh
+  (
+  aCheckbox : handle;
+  ) : logic;
+local
+  {
+  tLogic : logic;
+  tState : int;
+  }
+{
+if(aCheckbox = 0)
+  return(false);
+
+tState # aCheckbox->wpCheckState;
+if (tState = 2)
+  return(true);
+else
+  return(false);
+}
+
+//=================================================================================================
+// SetCh()
+//=================================================================================================
+sub SetCh
+  (
+  aCheckBox : handle;
+  aLogic : logic;
+  )
+local
+  {
+  tLogic : logic;
+  tState : int;
+  }
+{
+if(aLogic)
+  aCheckBox->wpCheckState # _WinStateChkChecked;
+else
+  aCheckBox->wpCheckState # _WinStateChkUnChecked;
+}
+
+//=================================================================================================
+// FileCopy()
+//=================================================================================================
+sub FileCopy
+  (
+  aPathSource : alpha(512);
+  aPathTarget : alpha(512);
+  )
+local
+  {
+  tFsi : handle;
+  tMem : handle;
+  }
+{
+tFsi # FsiOpen(aPathSource,_FsiAcsR);
+if(tFsi <= 0)
+  return;
+tMem # MemAllocate(_MemAutoSize );
+tFsi->FsiReadMem(tMem,1,tFsi->FsiSize());
+tFsi->FsiClose();
+tFsi # FsiOpen(aPathTarget,_FsiAcsRW | _FsiCreate | _FsiTruncate);
+tFsi->FsiWriteMem(tMem,1,tMem->spLen);
+tFsi->FsiClose();
+tMem->MemFree();
+}
+
+//=================================================================================================
+// FileMove()
+//=================================================================================================
+sub FileMove
+  (
+  aPathSource : alpha(512);
+  aPathTarget : alpha(512);
+  ): int;
+local
+  {
+  tFsi : handle;
+  tMem : handle;
+  }
+{
+tFsi # FsiOpen(aPathSource,_FsiAcsR);
+if(tFsi <= 0)
+  return(tFsi);
+tMem # MemAllocate(_MemAutoSize );
+tFsi->FsiReadMem(tMem,1,tFsi->FsiSize());
+tFsi->FsiClose();
+tFsi # FsiOpen(aPathTarget,_FsiAcsRW | _FsiCreate | _FsiTruncate);
+if(tFsi <= 0)
+  return(tFsi);
+tFsi->FsiWriteMem(tMem,1,tMem->spLen);
+tFsi->FsiClose();
+tMem->MemFree();
+FsiDelete(aPathSource);
+return(0);
+}
+
+//=================================================================================================
+// FileToMem()
+//=================================================================================================
+sub FileToMem
+  (
+  aMem : handle;
+  aSourcePNE : alpha(512);
+  aOptions : int;
+  ) : int;
+local
+  {
+  tFsi : handle;
+  tRet : int;
+  }
+{
+if(aMem <= 0)
+  return(-1);
+tFsi # fsiOpen(aSourcePNE,aOptions);
+if (tFsi <=0)
+  return(tFsi);
+tRet # tFsi->fsiReadMem(aMem,1,FsiSize(tFsi));
+tFsi->FsiClose();
+Return(0);
+}
+
+//=================================================================================================
+// FileTryDelete
+//=================================================================================================
+sub FileTryDelete
+  (
+  aPath : alpha(4096);
+  )
+local
+  {
+  tRet : int;
+  }
+{
+try
+  {
+  ErrTryIgnore(_ErrAll);
+  tRet # FsiDelete(aPath);
+  }
+}
+
+//=================================================================================================
+// FileExists
+//=================================================================================================
+sub FileExists
+  (
+  aPath : alpha(4096);
+  ) : logic;
+local
+  {
+  tFsi : int;
+  tLet : logic;
+  }
+{
+try
+  {
+  ErrTryIgnore(_ErrAll);
+  tFsi # FsiOpen(aPath,_FsiAcsR);
+  FsiClose(tFsi);
+  if(tFsi > 0)
+    tLet # true;
+  }
+return(tLet);
+}
+
+//=================================================================================================
+// StrRep
+//=================================================================================================
+sub StrRep
+  (
+  aStr : alpha(4096);
+  aRep : alpha(100);
+  aIns : alpha(100);
+  opt aAll : logic;
+  ) : alpha;
+local
+  {
+  tStart : int;
+  tLen : int;
+  tFind : int;
+  tInsLen : int;
+  }
+{
+
+tInsLen # StrLen(aIns);
+tStart # 1;
+for tFind # StrFind(aStr,aRep,tStart,_StrCaseIgnore)
+loop tFind # StrFind(aStr,aRep,tStart,_StrCaseIgnore)
+while(tFind != 0)
+  {
+  aStr # StrDel(aStr,tFind,StrLen(aRep));
+  aStr # StrIns(aStr,aIns,tFind);
+  if (aAll = false)
+    break;
+  tStart # tFind+tInsLen;
+  }
+return(aStr);
+}
+
+//=================================================================================================
+// StrFileName
+//=================================================================================================
+sub StrFileName
+  (
+  aStr : alpha(4096);
+  ) : alpha;
+local
+  {
+  tCount : int;
+  tChar : int;
+  }
+{
+for tCount # 1
+loop Inc(tCount)
+while(tCount <= StrLen(aStr))
+  {
+  tChar # StrToChar(aStr,tCount);
+  switch(true) // remove "*/:<>?\|
+    {
+    case (tChar < 32 or tChar = 34 or tChar = 42 or tChar = 47 or tChar = 58 or tChar = 60 or tChar = 62 or tChar = 63 or tChar = 92 or tChar = 124) :
+      {
+      aStr # StrDel(aStr,tCount,1);
+      Dec(tCount);
+      }
+    }
+  }
+return(aStr);
+}
+
+//================================================================================
+// UserSetVariables
+//================================================================================
+sub UserSetVariables
+  (
+  var vUserNumber : int;
+  var vUserName : alpha;
+  )
+{
+vUserNumber # CnvIA(UserInfo(_UserCurrent));
+UserInfo(_UserCurrent);
+vUserName # UserInfo(_UserName);
+}
+
+
+//================================================================================
+// CreateTempFolder
+//================================================================================
+sub CreateTempFolder
+  (
+  aPrefix : alpha(20);
+  ) : alpha;
+local
+  {
+  tPath : alpha(128);
+  }
+{
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+//--- Globale Variablen | Ordner  ---------------
+tPath # "SYS-Temp"+'\C16~Temp';
+try
+  {
+  FsiPathCreate(tPath);
+  }
+tPath # tPath+'\'+aPrefix+UserInfo(_UserCurrent)+'\';
+try
+  {
+  FsiPathCreate(tPath);
+  }
+return(tPath)
+}
+
+//================================================================================
+// GetTempFolder
+//================================================================================
+sub GetTempFolder
+  (
+  aPrefix : alpha(20);
+  ) : alpha;
+local
+  {
+  tPath : alpha(128);
+  }
+{
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+//--- Globale Variablen | Ordner  ---------------
+tPath # "SYS-Temp"+'\C16~Temp\'+aPrefix+UserInfo(_UserCurrent)+'\';
+return(tPath)
+}
+
+//================================================================================
+// DeleteTempFolder
+//================================================================================
+sub DeleteTempFolder
+  (
+  aPath : alpha(256);
+  )
+local
+  {
+  tDirHdl : handle;
+  tName : alpha(250);
+  tRet : int;
+  }
+{
+//--- Systemdaten lesen -------------------------
+RecRead(997,1,_RecFirst);
+if(StrFind(aPath,'\',1,_StrFindReverse) != StrLen(aPath))
+  aPath # aPath+'\';
+if(!(aPath =* "SYS-Temp"+'\*\'))
+  return;
+//--- Delete File -------------------------------
+tDirHdl # FsiDirOpen(aPath,_FsiAttrHidden | _FsiAttrDir);
+for tName   # tDirHdl->FsiDirRead();
+loop tName   # tDirHdl->FsiDirRead();
+while (tName != '')
+  {
+  if(tNAme = '.' or tName = '..')
+    cycle;
+  tRet # FsiAttributes(aPath+tName);
+  tRet # _FsiAttrDir;
+  if(FsiAttributes(aPath+tName)&_FsiAttrDir = _FsiAttrDir)
+    {
+    DeleteTempFolder(aPath+tName);
+    }
+  else
+    {
+    tRet # fsiDelete(aPath+'\'+tName);
+    }
+  }
+tDirHdl->FsiDirClose();
+//--- Delete Dir --------------------------------
+tRet # fsiPathDelete(aPath);
+}
+
+
+//================================================================================
+// LenToByte
+//================================================================================
+sub LenToByte
+  (
+  afloat : float;
+  ) : alpha;
+local
+  {
+  tBit : alpha(16);
+  tRet : int;
+  tFloat : float;
+  tFloat2 : float;
+  tRnd : float;
+  tByte : alpha(16);
+  tInt : int;
+  }
+{
+switch(true)
+{
+case aFloat < 1024\f: // Bytes
+  {
+  tByte # CnvAF(aFloat,_FmtInternal)+' Bytes';
+  }
+case aFloat < 1048576\f : // KB
+  {
+  tFloat # aFloat/1024\f;
+  tFloat2 # Log10(tFloat)
+  tFloat2 # Floor(tFloat2)
+  tInt # 2-CnvIF(tFloat2);
+  if(tInt < 0)
+    tInt # 0;
+  tRnd # Trn(tFloat,tInt);
+  tByte # CnvAF(tRnd,_FmtInternal)+' KB';
+  }
+case aFloat < 1073741824\f : // MB
+  {
+  tFloat # aFloat/1048576\f;
+  tFloat2 # Log10(tFloat)
+  tFloat2 # Floor(tFloat2)
+  tInt # 2-CnvIF(tFloat2);
+  if(tInt < 0)
+    tInt # 0;
+  tRnd # Trn(tFloat,tInt);
+  tByte # CnvAF(tRnd,_FmtInternal)+' MB';
+  }
+case aFloat < 1099511627776\f: //GB
+  {
+  tFloat # aFloat/1073741824\f;
+  tFloat2 # Log10(tFloat)
+  tFloat2 # Floor(tFloat2)
+  tInt # 2-CnvIF(tFloat2);
+  if(tInt < 0)
+    tInt # 0;
+  tRnd # Trn(tFloat,tInt);
+  tByte # CnvAF(tRnd,_FmtInternal)+' GB';
+  }
+case aFloat < 1125899906842624\f : //TB
+  {
+  tFloat # aFloat/1099511627776\f;
+  tFloat2 # Log10(tFloat)
+  tFloat2 # Floor(tFloat2)
+  tInt # 2-CnvIF(tFloat2);
+  if(tInt < 0)
+    tInt # 0;
+  tRnd # Trn(tFloat,tInt);
+  tByte # CnvAF(tRnd,_FmtInternal)+' TB';
+  }
+case aFloat < 1152921504606846976\f : //EB
+  {
+  tFloat # aFloat/1125899906842624\f;
+  tFloat2 # Log10(tFloat)
+  tFloat2 # Floor(tFloat2)
+  tInt # 2-CnvIF(tFloat2);
+  if(tInt < 0)
+    tInt # 0;
+  tRnd # Trn(tFloat,tInt);
+  tByte # CnvAF(tRnd,_FmtInternal)+' EB';
+  }
+}
+
+return(tByte);
+}
+
+//================================================================================
+// PathCreate()
+//================================================================================
+sub PathCreate
+  (
+  aPath : alpha(512);
+  )
+local
+  {
+  tRet : int;
+  tBegin : int;
+  tFind : int;
+  tFolder : alpha(256);
+  tCount : int;
+  tPath : alpha(512);
+  }
+{
+
+//--- Format Path -------------------------------
+if(StrCut(aPath,2,2) != ':\')
+  return;
+
+if(StrCut(aPath,StrLen(aPath),1) != '\')
+  aPath # aPath+'\';
+//--- Loop --------------------------------------
+tFind # 1;
+tBegin # 1;
+For tFind # StrFind(aPath,'\',tFind);
+loop tFind # StrFind(aPath,'\',tFind);
+while(tFind != 0 and tCount < 100)
+  {
+  Inc(tCount);
+  if(tCount != 1)
+    {
+    tPath # StrCut(aPath,1,tFind);
+    try
+      {
+      ErrTryIgnore(-39);
+      tRet # FsiPathCreate(tPath);
+      }
+    }
+  tBegin # tFind+1;
+  tFind # tFind+1;
+  }
+}
+
+//================================================================================
+// DialogDelete()
+//================================================================================
+sub DialogDelete
+  (
+  aFrmParent : handle;
+  aInfoText : alpha(64);
+  ) : logic;
+local
+  {
+  tRet : int;
+  tFrame : handle;
+  tId : Int;
+  }
+{
+tFrame # WinOpen('Mdl_Delete',_WinOpenDialog);
+$lInfo->wpCaption # aInfoText;
+tRet # WinDialogRun(tFrame,_WinDialogCenter,aFrmParent);
+tFrame->WinClose();
+if(tRet = 1)
+  return(true);
+else
+  return(false);
+}
+
+//=================================================================================================
+// NodeRead()
+//=================================================================================================
+sub NodeRead
+  (
+  aCte : handle;
+  aPath : alpha(128);
+  ) : handle;
+local
+  {
+  tItem : handle;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0, aPath);
+return(tItem)
+}
+
+//=================================================================================================
+// NodeReadAlpha()
+//=================================================================================================
+sub NodeReadAlpha
+  (
+  aCte : handle;
+  aPath : alpha(64);
+  ) : alpha;
+local
+  {
+  tItem : handle;
+  }
+{
+if(aPath = '')
+  {
+  tItem # aCte->CteRead(_CteChildList | _CteFirst);
+  return(tItem->spValueAlpha);
+  }
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return('');
+tItem # tItem->CteRead(_CteChildList | _CteFirst);
+if(tItem = 0)
+  return('');
+return(tItem->spValueAlpha);
+}
+
+//=================================================================================================
+// NodeReadInt()
+//=================================================================================================
+sub NodeReadInt
+  (
+  aCte : handle;
+  aPath : alpha(32);
+  ) : int;
+local
+  {
+  tItem : handle;
+  tValue : int;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(0);
+tItem # tItem->CteRead(_CteChildList | _CteFirst);
+if(tItem = 0)
+  return(0);
+tValue # CnvIA(tItem->spValueAlpha);
+return(tValue);
+}
+
+//=================================================================================================
+// NodeReadLogic()
+//=================================================================================================
+sub NodeReadLogic
+  (
+  aCte : handle;
+  aPath : alpha(32);
+  ) : logic;
+local
+  {
+  tItem : handle;
+  tValue : logic;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0,aPath);
+if(tItem = 0)
+  return(false);
+tItem # tItem->CteRead(_CteChildList | _CteFirst);
+if(tItem = 0)
+  return(false);
+tValue # CnvLI(CnvIA(tItem->spValueAlpha));
+return(tValue);
+}
+
+//=================================================================================================
+// NodeClear()
+//=================================================================================================
+sub NodeClear
+  (
+  aCte : handle;
+  aPath : alpha(128);
+  ) : handle;
+local
+  {
+  tItem : handle;
+  }
+{
+tItem # aCte->CteRead(_CteNodePath, 0, aPath);
+CteClear(tItem,true,_CteChild);
+return(tItem)
+}
+
+//=================================================================================================
+// NodeGetText()
+//=================================================================================================
+sub NodeGetText
+  (
+  aCte : handle;
+  aItem : handle;
+  ) : alpha;
+local
+  {
+  tItem : handle;
+  }
+{
+tItem # aItem->CteRead(_CteChildList | _CteFirst);
+if(tItem = 0)
+  return('');
+return(tItem->spValueAlpha)
+}
+
+
+
+
+
+//=================================================================================================
+// MemoryCnv()
+//=================================================================================================
+sub MemoryCnv
+  (
+  aMem : handle;
+  aCharsetSource : int;
+  aCharsetTarget : int;
+  )
+local
+  {
+  tTarget : handle;
+  tLen : int;
+  tPosBegin : int;
+  tPosEnd : int;
+  tPos : int;
+  }
+{
+tTarget # MemAllocate(_MemAutoSize);
+aMem->spCharset # aCharsetSource;
+MemCnv(aMem,tTarget,aCharsetTarget);
+//-----------------------------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+}
+
+
+
+//=================================================================================================
+// Memory Insert
+//=================================================================================================
+sub MemoryInsert
+  (
+  aMem : handle;
+  aPosition : int;
+  aInsert : alpha(200);
+  ) : int;
+{
+MemCopy(aMem,aPosition,aMem->spLen-aPosition+1,aPosition+StrLen(aInsert),aMem);
+MemWriteStr(aMem,aPosition,aInsert,_sys->spCharset);
+}
+
+//=================================================================================================
+// Memory Replace
+//=================================================================================================
+sub MemoryReplace
+  (
+  aMem : handle;
+  aOld : alpha(200);
+  aNew : alpha(200);
+  ) : int;
+local
+  {
+  tTarget : handle;
+  tFind : int;
+  tAlpha : alpha(200);
+  tStart : int;
+  tRep : int;
+  }
+{
+tTarget # MemAllocate(_MemAutoSize);
+tTarget->spCharset # aMem->spCharset;
+tStart # 1
+do
+  {
+  tFind # MemFindStr(aMem,tStart,aMem->spLen-tStart,aOld,_StrCaseIgnore);
+  if (tFind > 0)
+    {
+    tRep # 1;
+    MemCopy(aMem,tStart,tFind-tStart,tTarget->spLen+1,tTarget);
+    MemWriteStr(tTarget,tTarget->spLen+1,aNew,_sys->spCharset);
+    tStart # tFind+StrLen(aOld);
+    }
+  else
+    MemCopy(aMem,tStart,aMem->spLen-tStart+1,tTarget->spLen+1,tTarget);
+  }
+while(tFind != 0)
+//--- End -------------------------
+MemWriteByte(aMem,1,0,aMem->spLen);
+aMem->spLen # 0;
+MemCopy(tTarget,1,tTarget->spLen,1,aMem);
+tTarget->MemFree();
+return(tRep)
+}
+
+
+//=========================================================================================
+// CharsetToC16
+//=========================================================================================
+sub CharsetToInt
+  (
+  aCharset : alpha(50);
+  aCarsetDefault : int;
+  ): int;
+local
+  {
+  tCharset : int;
+  }
+{
+aCharset # StrAdj(aCharset,_StrBegin | _StrEnd);
+aCharset # StrCnv(aCharset,_StrLower);
+switch (aCharset)
+  {
+  case 'c16_1250 '    : tCharset # _CharsetC16_1250;
+  case 'c16_1252'     : tCharset # _CharsetC16_1252;
+  case 'c16_1254'     : tCharset # _CharsetC16_1254;
+  case 'windows-1250' : tCharset # _CharsetWCP_1250;
+  case 'windows-1252' : tCharset # _CharsetWCP_1252;
+  case 'windows-1254' : tCharset # _CharsetWCP_1254;
+  case 'oem'          : tCharset # _CharsetOEM;
+  case 'oem_852'      : tCharset # _CharsetOEM_852
+  case 'iso-8859-1'   : tCharset # _CharsetISO_8859_1;
+  case 'iso-8859-2'   : tCharset # _CharsetISO_8859_2;
+  case 'iso-8859-9'   : tCharset # _CharsetISO_8859_9;
+  case 'iso-8859-15'  : tCharset # _CharsetISO_8859_15;
+  case 'html'         : tCharset # _CharsetHTML;
+  case 'utf-8'        : tCharset # _CharsetUTF8;
+  case 'utf-16'       : tCharset # _CharsetUTF16;
+  case 'uri'          : tCharset # _CharsetURI;
+  case 'us-ascii'     : tCharset # _CharsetUTF8;
+  default             : tCharset # aCarsetDefault;
+  }
+return(tCharset);
+}
+
+//=========================================================================================
+// IntToCharset
+//=========================================================================================
+sub IntToCharset
+  (
+  aInt : int;
+  ): alpha;
+local
+  {
+  tCharset : alpha(50);
+  }
+{
+switch (aInt)
+  {
+  case  _CharsetC16_1250    : tCharset # 'c16_1250 ';
+  case _CharsetC16_1252     : tCharset # 'c16_1252';
+  case _CharsetC16_1254     : tCharset # 'c16_1254';
+  case _CharsetWCP_1250     : tCharset # 'windows-1250';
+  case _CharsetWCP_1252     : tCharset # 'windows-1252';
+  case _CharsetWCP_1254     : tCharset # 'windows-1254';
+  case _CharsetOEM          : tCharset # 'oem';
+  case _CharsetOEM_852      : tCharset # 'oem_852'
+  case _CharsetISO_8859_1   : tCharset # 'iso-8859-1';
+  case _CharsetISO_8859_2   : tCharset # 'iso-8859-2';
+  case _CharsetISO_8859_9   : tCharset # 'iso-8859-9';
+  case _CharsetISO_8859_15  : tCharset # 'iso-8859-15';
+  case _CharsetHTML         : tCharset # 'html';
+  case _CharsetUTF8         : tCharset # 'utf-8';
+  case _CharsetUTF16        : tCharset # 'utf-16';
+  case _CharsetURI          : tCharset # 'uri';
+  case _CharsetUTF8         : tCharset # 'us-ascii';
+  default                   : tCharset # 'undefined';
+  }
+return(tCharset);
+}
+
+//=================================================================================================
+// FileToAlpha()
+//=================================================================================================
+sub FileToAlpha
+  (
+  aSourcePNE : alpha(512);
+  ) : alpha;
+local
+  {
+  tFsi : handle;
+  tRet : int;
+  tAlpha : alpha(4096);
+  }
+{
+tFsi # fsiOpen(aSourcePNE,_FsiAcsR);
+if (tFsi <=0)
+  return('');
+tRet # tFsi->FsiRead(tAlpha);
+tFsi->FsiClose();
+Return(tAlpha);
+}

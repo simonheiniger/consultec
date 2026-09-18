@@ -1,0 +1,68 @@
+Patch für Eml_Main (SwissMail-Hauptfenster)
+===========================================
+
+Ziel: Im Menü "Extras" von SwissMail direkt unter "Einstellungen" (miPrefDialog)
+einen Eintrag "SMS-Einstellungen..." ergänzen, der Sms_Cfg:Dialog() öffnet.
+
+Der Menüeintrag wird per Code angefügt - im Designer muss am Menü nichts
+geändert werden. WinMenuItemAdd() wird in Eml_Main bereits so verwendet
+(EvtMenuInitPopupShortcut, EvtMenuInitPopupAction).
+
+
+1) Menüeintrag anfügen - eigene sub SmsMenuAdd(), zweimal aufgerufen
+--------------------------------------------------------------------
+
+Eml_Main hat zwei Startwege:
+  - main()  : SwissMail als eigenständiges Programm  -> ruft InitUI() NICHT auf
+  - Init()  : SwissMail als Modul in SwissGarage     -> ruft InitUI() auf
+Darum steckt der Code in einer eigenen sub, die von beiden Wegen aufgerufen wird.
+
+Die sub legt zwei Eintraege an: "SMS-Einstellungen..." (miSmsPref) und darunter
+"SMS-Verlauf..." (miSmsLog).
+
+a) sub SmsMenuAdd() direkt vor dem Kommentarkopf von InitUI() einfügen
+   (vollständig siehe komplett/Eml_Main.txt). Sie prüft zuerst $miSmsPref > 0,
+   damit der Eintrag nie doppelt entsteht.
+
+b) Aufruf in main(), direkt nach
+     gFrmMain # WinOpen('Eml_Main',_WinOpenDialog);
+   einfügen:
+     SmsMenuAdd();
+
+c) Aufruf am Ende von InitUI(), vor der schliessenden Klammer:
+     SmsMenuAdd();
+
+
+2) Menübefehl behandeln - in sub EvtMenuCommand(), im Block "//--- Extras ---"
+------------------------------------------------------------------------------
+
+Direkt unter der bestehenden Zeile
+
+  case 'miPrefDialog' : Eml_PrefDialog(gFrmMain,gPref,gUserId);
+
+einfügen:
+
+  case 'miSmsPref' : Sms_Cfg:Dialog(gFrmMain);
+  case 'miSmsLog'  : Sms_LogDlg();
+
+
+Hinweise
+--------
+
+A) Belegt durch die CONZEPT-16-Hilfe:
+   - WinInfo(_WinParent) liefert das übergeordnete Objekt (Wert 3)
+   - WinMenuItemAdd(Name, Titel, Position): auf einem Menüeintrag aufgerufen
+     landet der neue Eintrag in dessen Untermenü; Position 0 = ans Ende
+   - _WinFirst/_WinNext laufen in Erstellungsreihenfolge
+
+B) InitUI läuft einmal beim Öffnen des Fensters - der Eintrag erscheint
+   also nicht doppelt.
+
+C) Beim ersten Test kontrollieren, ob "SMS-Einstellungen..." wirklich unter
+   "Einstellungen" steht. Wurde das Menü im Designer umsortiert, kann die
+   Erstellungsreihenfolge von der Anzeige abweichen - dann steht der Eintrag
+   an einer anderen Stelle im Extras-Menü, funktioniert aber genauso.
+
+D) Fallback ohne Code: im Designer bei der Maske Eml_Main im Menü "Extras"
+   einen Eintrag mit Name "miSmsPref" und Text "SMS-Einstellungen..." anlegen.
+   Dann entfällt Schritt 1, Schritt 2 bleibt gleich.

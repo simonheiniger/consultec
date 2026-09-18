@@ -1,0 +1,29 @@
+@A+
+@C+
+
+//=======================================================================================
+//   getResolveBody()
+//=======================================================================================
+sub getResolveBody
+(
+  aMem : handle;
+  var aBody : handle;
+)
+local
+{
+  tRet : int;
+  tBr : alpha(2);
+  tStart : Int;
+}
+{
+  tBr # StrChar(13)+StrChar(10)
+  tStart # MemFindStr(aMem,1,aMem->spLen,tBr+tBr);
+  if(tStart = 0)
+    return;
+    
+  tStart # tStart+4;
+
+  
+  aBody # MemAllocate(aMem->spLen);
+  MemCopy(aMem,tStart,aMem->spLen-tStart+1,1,aBody);
+}

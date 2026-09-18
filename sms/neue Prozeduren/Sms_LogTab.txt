@@ -1,0 +1,56 @@
+SMS-Log-Tabelle 516 — Aufbau
+============================
+
+Angelegt im Datenstruktureditor (Designer → Extras → Datenstruktureditor, Strg+K).
+Aufbau nach dem Vorbild 501 / Telefonhistory THI.
+
+Datei
+-----
+  Dateinummer  516
+  Dateiname    SMS-Protokoll
+  sequentielles Einfügen ✓, übrige Haken leer
+
+Teildatensatz
+-------------
+  1 / SMS-Log
+
+Felder  (Typ wie im Editor benannt; Berechtigungen wie bei THI auf 10 lassen)
+------------------------------------------------------------------------------
+
+  Nr  Name             Typ                Max. Länge  Inhalt
+  --  ---------------  -----------------  ----------  ------------------------------------
+   1  SMS-Datum        Datum                          Tag des Versands
+   2  SMS-Zeit         Zeit                           Uhrzeit (auch für die Sortierung)
+   3  SMS-ADR DatIdt   ganzzahlig lang                Adresse (ADR-DatIdt), 0 = ohne
+   4  SMS-Nummer       alphanumerisch     50          Empfänger in E.164, +41791234567
+   5  SMS-Absender     alphanumerisch     20          Originator, z.B. CONSULTEC
+   6  SMS-User         alphanumerisch     32          Benutzerkürzel (Lib_User:GetId())
+   7  SMS-Ergebnis     alphanumerisch     250         "versendet" oder "FEHLER: ..."
+   8  SMS-Status       alphanumerisch     20          StatusCode ASPSMS, "1" = angenommen
+   9  SMS-MessageId    alphanumerisch     100         TransReferenceNumber von ASPSMS
+  10  SMS-Segmente     ganzzahlig kurz                Anzahl Segmente (= Kosten in Credits)
+  11  SMS-Text         alphanumerisch     250         Nachrichtentext (max. 160 Zeichen)
+
+Kein eigenes Nummernfeld: CONZEPT vergibt die Datensatz-ID selbst - genau wie bei
+501 / Telefonhistory, wo es ebenfalls keines gibt.
+
+Schlüssel
+---------
+  1 / SMS-DatZeit    SMS-Datum + SMS-Zeit     (Sortierung, Verlauf wird rückwärts gelesen)
+  2 / SMS-ADRDatZeit SMS-ADR DatIdt + SMS-Datum + SMS-Zeit  (Verlauf je Adresse)
+
+Vorbild: THI hat dieselben zwei Schlüsselarten (1 THI-TelDatZeit, 2 THI-ADRDatZeit,
+3 THI-DatZeit).
+
+Umstellung im Code
+------------------
+In Sms_Log.prc oben:
+
+  define
+    {
+    sSmsTabLog : 516
+    }
+
+0 = weiterhin der CONZEPT-Text SMS_LOG, 516 = Tabelle.
+Die Masken (Sms_LogView) bleiben unverändert.
+Alte Einträge aus SMS_LOG werden nicht übernommen.

@@ -1,0 +1,39 @@
+Maske "Sms_LogView" — Verlauf der versendeten SMS
+=================================================
+
+Frame im Designer, Name  Sms_LogView,  Base → Caption: SMS-Verlauf
+AreaWidth 900, AreaHeight 520
+
+Wird geoeffnet vom Knopf "Verlauf" im Fenster SMS senden (Sms_LogDlg).
+
+
+Objekte
+-------
+
+  #  Reiter          Objekt    Name           Caption      Left Top  Width Height
+  -- --------------  --------  -------------  -----------  ---- ---- ----- ------
+  1  Ansicht         DataList  dlSmsLog       -              20   20   860   400
+  2  Ausgabe         Label     lbSmsLogInfo   -              20  432   500    20
+  3  Schaltflächen   Button    btSmsLogClose  &Schliessen   770  450   110    28
+
+Einstellungen:
+  - dlSmsLog        LstStyle = _WinLstNoHeader ist NICHT noetig: hier sind Spaltentitel
+                    sinnvoll. Also LstStyle auf _WinLstHeader lassen und HdrHeight z.B. 20.
+  - btSmsLogClose   Special → TypeButton _WinBtnClose, Id 2
+
+  Spalten von dlSmsLog (Rechtsklick → "Spalten bearbeiten..."), alle Visible ✓,
+  Reihenfolge ist wichtig - die Nummern stehen im Code:
+    1 clmLogDate    Caption "Datum"        Breite  90
+    2 clmLogName    Caption "Empfaenger"   Breite 200   <-- NEU
+    3 clmLogNumber  Caption "Nummer"       Breite 140
+    4 clmLogResult  Caption "Ergebnis"     Breite 200
+    5 clmLogSize    Caption "Umfang"       Breite  70
+    6 clmLogText    Caption "Text"         Breite 320
+
+Aufruf:
+  Sms_LogDlg()        alle SMS          (SwissMail -> Extras -> SMS-Verlauf...)
+  Sms_LogDlg(AdrId)   nur ein Empfaenger (Knopf "Verlauf" im Fenster SMS senden)
+
+Hinweis: Der Verlauf steht im CONZEPT-Text SMS_LOG, eine Zeile pro Versuch.
+Wird spaeter eine richtige SMS-Log-Tabelle angelegt, aendert sich nur Sms_Log:Write()
+und Sms_Log:Fill(); diese Maske bleibt unveraendert.
